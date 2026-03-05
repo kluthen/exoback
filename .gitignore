@@ -1,2 +1,6 @@
 pipeline_output
 .agent
+*.db
+.env
+*.log
+exo.md
