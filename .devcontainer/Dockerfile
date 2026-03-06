@@ -29,9 +29,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     golang-go \
     procps \
-    && docker-php-ext-install gd pdo pdo_pgsql zip bcmath intl \
+    && docker-php-ext-install gd pdo pdo_pgsql zip bcmath intl pcntl \
     && rm -rf /var/lib/apt/lists/*
-
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

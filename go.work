@@ -1,0 +1,10 @@
+go 1.25.0
+
+use (
+	./upsilonapi
+	./upsilonbattle
+	./upsilonmapdata
+	./upsilonmapmaker
+	./upsilonserializer
+	./upsilontools
+)
