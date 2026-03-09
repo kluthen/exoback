@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ecumeurs/upsilonapi/api"
+	"github.com/ecumeurs/upsilonapi/handler"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -14,8 +14,8 @@ func main() {
 	// Internal Arena Management
 	internal := r.Group("/internal")
 	{
-		internal.POST("/arena/start", api.HandleArenaStart)
-		internal.POST("/arena/:id/action", api.HandleArenaAction)
+		internal.POST("/arena/start", handler.HandleArenaStart)
+		internal.POST("/arena/:id/action", handler.HandleArenaAction)
 	}
 
 	if err := r.Run(":8080"); err != nil {

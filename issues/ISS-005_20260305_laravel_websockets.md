@@ -42,9 +42,10 @@ WebSocket infrastructure is currently missing.
 
 ## Recommended Fix
 
-**Short term:** Install and configure Laravel Reverb (or Soketi) as the default broadcasting driver.
-**Medium term:** Define private broadcasting channels for `arena.{id}`. Ensure the authorization callbacks logic validates that only users actively participating in `arena.{id}` can subscribe. Create Laravel Event classes (`TurnStarted`, `BoardUpdated`, `GameEnded`) that implement `ShouldBroadcast`. Hook these events up to be fired by the `WebhookController` (from ISS-004).
-**Long term:** N/A
+* [x] **Short term:** Install and configure Laravel Reverb (or Soketi) as the default broadcasting driver.
+  * Reverb has been installed and tested. It's operationnal but see issue ISS-008. 
+* [ ] **Medium term:** Define private broadcasting channels for `arena.{id}`. Ensure the authorization callbacks logic validates that only users actively participating in `arena.{id}` can subscribe. Create Laravel Event classes (`TurnStarted`, `BoardUpdated`, `GameEnded`) that implement `ShouldBroadcast`. Hook these events up to be fired by the `WebhookController` (from ISS-004).
+* [ ] **Long term:** N/A
 
 ---
 

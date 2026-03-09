@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ecumeurs/upsilonapi/stdmessage"
+	"github.com/ecumeurs/upsilonbattle/battlearena/entity"
 )
 
 // @spec-link [[api_go_battle_engine]]
@@ -31,10 +32,16 @@ type Grid struct {
 	Cells  [][]Cell `json:"cells"` // Cells are stored in width-major order.
 }
 
+type Turn struct {
+	PlayerID string `json:"player_id"`
+	Delay    int    `json:"delay"`
+	EntityID string `json:"entity_id"`
+}
+
 type BoardState struct {
 	Entities        []Entity  `json:"entities"`
 	Grid            Grid      `json:"grid"`
-	Turn            int       `json:"turn"`
+	Turn            []Turn    `json:"turn"`
 	CurrentPlayerID string    `json:"current_player_id"`
 	CurrentEntityID string    `json:"current_entity_id"`
 	Timeout         time.Time `json:"timeout"` // End of turn date.
@@ -75,5 +82,21 @@ func NewSuccess[T any](requestId string, msg string, data T) stdmessage.Standard
 		Meta:      stdmessage.MetaNil{},
 		Success:   true,
 		Data:      data,
+	}
+}
+
+// NewEntity creates a new Entity from the given entity (upsilonbattle's)
+func NewEntity(entity entity.Entity) Entity {
+	return Entity{
+		ID:       entity.ID.String(),
+		PlayerID: entity.ControllerID.String(),
+		Name:     entity.Name,
+		HP:       entity.GetPropertyC("HP").GetValue(),
+		MaxHP:    entity.GetPropertyC("HP").GetMaxValue(),
+		Attack:   entity.GetPropertyI("Attack").I(),
+		Defense:  entity.GetPropertyI("Defense").I(),
+		Move:     entity.GetPropertyC("Movement").GetValue(),
+		MaxMove:  entity.GetPropertyC("Movement").GetMaxValue(),
+		Position: Position{X: entity.Position.X, Y: entity.Position.Y},
 	}
 }

@@ -46,7 +46,6 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 | [Implement Laravel API Gateway Endpoints](issues/ISS-007_20260305_laravel_api_endpoints.md) | 2026-03-05 | Open | High | The Laravel API needs to implement the proxy and meta-game HTTP endpoints def... |
 | [Implement HTTP Controller for UpsilonBattle](issues/ISS-006_20260305_upsilonbattle_http_controller.md) | 2026-03-05 | Open | High | To support the Proxied Communication architecture, the Go engine needs an HTT... |
 | [Implement Laravel WebSocket Communication Layer](issues/ISS-005_20260305_laravel_websockets.md) | 2026-03-05 | Open | High | To avoid aggressive REST polling, the system requires a real-time WebSocket l... |
-| [Map Generation ignores specifications](issues/ISS-004_20260305_upsilonbattle_mapgen_ignores_spec.md) | 2026-03-05 | Open | Medium | In `upsilonbattle/battlearena/ruler.go`, the `NewRuler` function hardcodes th... |
 | [UpsilonBattle missing team handling](issues/ISS-003_20260305_upsilonbattle_missing_teams.md) | 2026-03-05 | Open | High | The `upsilonbattle` engine currently lacks any concept of "teams" or alliance... |
 | [Missing JSON REST API & Webhook Dispatcher in Go Engine](issues/ISS-002_20260305_upsilonbattle_api_gap.md) | 2026-03-05 | Open | High | The current `upsilonbattle` Go engine lacks a JSON REST API and a webhook dis... |
 | [UpsilonBattle Mechanics Gap Analysis](issues/ISS-001_20260305_upsilonbattle_mechanics_gap.md) | 2026-03-05 | Open | Medium | There are multiple inconsistencies between the high-level specifications (REA... |

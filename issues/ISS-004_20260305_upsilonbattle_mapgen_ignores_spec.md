@@ -4,7 +4,7 @@
 **Ref:** `ISS-004`
 **Date:** 2026-03-05
 **Severity:** Medium
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonbattle/battlearena/ruler`
 **Affects:** Map Generation
 
@@ -69,4 +69,9 @@ The battle arena requires a map (grid) to play on. The dimensions, obstruction r
 
 ## References
 
-- `/workspace/upsilonbattle/battlearena/ruler/ruler.go`
+---
+
+## Change Log
+
+- **2026-03-09**: Marked as resolved per user request. The `NewRuler` and `SetGrid` methods now allow for external grid configuration, addressing the core issue of hardcoded map generation in `NewCompleteRuler`.
+

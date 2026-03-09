@@ -42,9 +42,10 @@ This does not exist in the current application.
 
 ## Recommended Fix
 
-**Short term:** Define the interfaces and create a placeholder HTTP Controller that implements the required player/controller signature.
-**Medium term:** Implement the HTTP router (e.g., standard `net/http`) and the outbound webhook dispatcher. Ensure necessary cross-domain libraries are moved/available in the Go workspace. Validate that the controller successfully bridges `POST` requests and `AddController` requirements.
-**Long term:** N/A
+* [x] **Short term:** Define the interfaces and create a placeholder HTTP Controller that implements the required player/controller signature.
+* [x] **Medium term:** Implement the HTTP router (e.g., standard `net/http`) and the outbound webhook dispatcher. Ensure necessary cross-domain libraries are moved/available in the Go workspace. Validate that the controller successfully bridges `POST` requests and `AddController` requirements.
+* [ ] **Event pushing:** some event are pushed toward the exterior (Battle Begin, Turn Begin, etc...) These needs a webhook to have been provided and the service will have to call on that webhook to forward the event informations.
+* [ ] **Long term:** N/A
 
 ---
 

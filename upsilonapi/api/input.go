@@ -26,13 +26,16 @@ type Entity struct {
 	Attack   int      `json:"attack"`
 	Defense  int      `json:"defense"`
 	Move     int      `json:"move"`
-	Position Position `json:"position"`
+	MaxMove  int      `json:"max_move"`
+	Position Position `json:"position"` // not used at start
 }
 
 // @spec-link [[entity_player]]
 type Player struct {
 	ID       string   `json:"id"`
 	Entities []Entity `json:"entities"`
+	Team     int      `json:"team"`
+	IA       bool     `json:"ia"`
 }
 
 type ArenaStartRequest struct {

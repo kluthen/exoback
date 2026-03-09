@@ -10,6 +10,7 @@ import (
 	"github.com/ecumeurs/upsilonbattle/battlearena/controller"
 	"github.com/ecumeurs/upsilonbattle/battlearena/ruler/rulermethods"
 	"github.com/ecumeurs/upsilontools/tools/actor"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,9 +19,9 @@ type HTTPController struct {
 	CallbackURL string
 }
 
-func NewHTTPController(callbackURL string) *HTTPController {
+func NewHTTPController(id uuid.UUID, callbackURL string) *HTTPController {
 	hc := &HTTPController{
-		Controller:  controller.New(),
+		Controller:  controller.NewController(id),
 		CallbackURL: callbackURL,
 	}
 
