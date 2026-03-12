@@ -36,10 +36,7 @@ Upon any Ruler broadcast event (`EntitiesStateChanged`, `ControllerNextTurn`, `B
 - Must withstand failure (e.g., exponential backoff if Laravel webhook receiver is down).
 
 ## TECHNICAL INTERFACE (The Bridge)
-- **API Endpoint:** `POST /internal/arena/*`
-- **Code Tag:** `@spec-link [[api_go_battle_engine]]`
-- **Related Issue:** `ISS-006`
-- **Test Names:** `TestArenaStartHTTP`, `TestActionProxyHTTP`, `TestWebhookDispatcherFires`
+Test Names: TestArenaStartHTTP, TestActionProxyHTTP, TestWebhookDispatcherFires, TestBattleFullRoundtrip
 
 ## EXPECTATION (For Testing)
 - Send `POST /internal/arena/{id}/action` with valid payload -> Go engine parses to `ControllerAttack` -> Ruler emits `EntitiesStateChanged` -> Dispatcher fires `POST {callback_url}` with updated HP payload.

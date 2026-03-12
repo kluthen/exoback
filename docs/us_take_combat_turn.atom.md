@@ -29,8 +29,7 @@ Capture the experience of an active player controlling a character in combat wit
 - Acceptance Criterion 4: I cannot target allied characters for attacks.
 
 ## TECHNICAL INTERFACE (The Bridge)
-- **Code Tag:** `@spec-link [[us_take_combat_turn]]`
-- **Test Names:** `TestUSTurnTimerVisible`, `TestUSTurnAutoPassPenalty`, `TestUSFriendlyFireBlocked`
+Test Names: TestUSTurnTimerVisible, TestUSTurnAutoPassPenalty, TestUSFriendlyFireBlocked, TestBattleFullRoundtrip
 
 ## EXPECTATION (For Testing)
 - Active character highlighted -> Timer counts down -> Player clicks attack on enemy -> HP reduced -> Turn ends and delay calculated.

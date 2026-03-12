@@ -25,11 +25,7 @@ To provide a scalable HTTP bridge for the UpsilonBattle engine, enabling externa
   - `EVENT`: Listens for `Ruler` broadcasts and pushes them to the registered `callback_url`.
 
 ## TECHNICAL INTERFACE (The Bridge)
-- **Primary Package:** `github.com/ecumeurs/upsilonapi`
-- **Core Components:**
-  - `Server`: Handles HTTP routing and payload validation.
-  - `Bridge`: Manages the lifecycle of `Ruler` actors.
-  - `HTTPController`: Implements the `Controller` actor interface for webhook dispatching.
+Test Names: TestBattleFullRoundtrip
 
 ## EXPECTATION (For Testing)
 - High availability for the HTTP server.

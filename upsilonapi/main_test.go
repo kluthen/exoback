@@ -29,6 +29,7 @@ func setupRouter() *gin.Engine {
 	return r
 }
 
+// @spec-link [[api_go_battle_engine]]
 func TestArenaStartEndpoint(t *testing.T) {
 	router := setupRouter()
 
@@ -137,6 +138,8 @@ func TestArenaStartEndpoint(t *testing.T) {
 	assert.True(t, expectedEvents["turn.started"], "Should have received turn.started event")
 }
 
+// @spec-link [[api_go_battle_engine]]
+// @spec-link [[us_take_combat_turn]]
 func TestBattleFullRoundtrip(t *testing.T) {
 	router := setupRouter()
 
@@ -212,7 +215,6 @@ func TestBattleFullRoundtrip(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var startResp api.ArenaStartResponseMessage
 	json.Unmarshal(w.Body.Bytes(), &startResp)
-	log.Printf("Start Response: %+v", startResp.Data)
 	arenaID := startResp.Data.ArenaID
 	p1ID := players[0].ID
 	p1e1ID := players[0].Entities[0].ID
