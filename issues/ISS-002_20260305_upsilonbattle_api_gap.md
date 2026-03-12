@@ -4,7 +4,7 @@
 **Ref:** `ISS-002`
 **Date:** 2026-03-05
 **Severity:** High
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonbattle/api` (needs creation)
 **Affects:** `laravel-api-gateway`
 

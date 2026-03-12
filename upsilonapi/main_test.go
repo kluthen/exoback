@@ -62,7 +62,7 @@ func TestArenaStartEndpoint(t *testing.T) {
 					MaxHP:    10,
 					Move:     2,
 					MaxMove:  2,
-					Position: api.Position{
+					Position: api.Position{ // note this position is fully arbitrary as it will be rolled by ruler.
 						X: 0,
 						Y: 5}}},
 			IA: false, // Must be false to trigger HTTPController webhooks
@@ -81,7 +81,7 @@ func TestArenaStartEndpoint(t *testing.T) {
 					MaxHP:    10,
 					Move:     2,
 					MaxMove:  2,
-					Position: api.Position{
+					Position: api.Position{ // note this position is fully arbitrary...
 						X: 5,
 						Y: 0}}},
 			IA: true}}
@@ -135,4 +135,175 @@ func TestArenaStartEndpoint(t *testing.T) {
 
 	assert.True(t, expectedEvents["game.started"], "Should have received game.started event")
 	assert.True(t, expectedEvents["turn.started"], "Should have received turn.started event")
+}
+
+func TestBattleFullRoundtrip(t *testing.T) {
+	router := setupRouter()
+
+	// Setup mock webhook receiver
+	webhookEvents := make(chan map[string]interface{}, 20)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var event map[string]interface{}
+		json.Unmarshal(body, &event)
+		log.Printf("Webhook received: %s", event["event_type"])
+		webhookEvents <- event
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+	defer close(webhookEvents)
+
+	id := uuid.New().String()
+	mid := uuid.New().String()
+	players := []api.Player{
+		{
+			ID:   uuid.NewString(), // P1
+			Team: 1,
+			Entities: []api.Entity{
+				{
+					ID:      uuid.NewString(),
+					Name:    "P1E1",
+					HP:      10,
+					Attack:  3,
+					Defense: 1,
+					MaxHP:   10,
+					Move:    2,
+					MaxMove: 2,
+					Position: api.Position{
+						X: 0,
+						Y: 0}}},
+			IA: false,
+		},
+		{
+			ID:   uuid.NewString(), // P2
+			Team: 2,
+			Entities: []api.Entity{
+				{
+					ID:      uuid.NewString(),
+					Name:    "P2E1",
+					HP:      10,
+					Attack:  3,
+					Defense: 1,
+					MaxHP:   10,
+					Move:    2,
+					MaxMove: 2,
+					Position: api.Position{
+						X: 1,
+						Y: 1}}},
+			IA: true}}
+
+	// 1. Start Arena
+	reqBody, _ := json.Marshal(api.ArenaStartMessage{
+		RequestID: id,
+		Message:   "Start",
+		Success:   true,
+		Data: api.ArenaStartRequest{
+			MatchID:     mid,
+			CallbackURL: ts.URL,
+			Players:     players,
+		},
+		Meta: stdmessage.MetaNil{},
+	})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/internal/arena/start", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var startResp api.ArenaStartResponseMessage
+	json.Unmarshal(w.Body.Bytes(), &startResp)
+	log.Printf("Start Response: %+v", startResp.Data)
+	arenaID := startResp.Data.ArenaID
+	p1ID := players[0].ID
+	p1e1ID := players[0].Entities[0].ID
+
+	// Wait for game.started and turn.started
+	waitForWebhook(t, webhookEvents, "game.started")
+	waitForWebhook(t, webhookEvents, "turn.started")
+
+	// 2. Move P1E1 to (0,1)
+	log.Printf("Executing MOVE action...")
+	moveReqBody, _ := json.Marshal(api.ArenaActionMessage{
+		RequestID: uuid.NewString(),
+		Data: api.ArenaActionRequest{
+			PlayerID: p1ID,
+			EntityID: p1e1ID,
+			Type:     "move",
+			TargetCoords: []api.Position{
+				{X: 0, Y: 1},
+			},
+		},
+	})
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/internal/arena/"+arenaID+"/action", bytes.NewBuffer(moveReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	log.Printf("MOVE status: %d, response: %s", w.Code, w.Body.String())
+
+	if w.Code == http.StatusOK {
+		var resp api.ArenaActionResponseMessage
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Contains(t, resp.Message, "move")
+	} else {
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	}
+
+	// 3. Attack P2E1 at (1,1)
+	log.Printf("Executing ATTACK action...")
+	attackReqBody, _ := json.Marshal(api.ArenaActionMessage{
+		RequestID: uuid.NewString(),
+		Data: api.ArenaActionRequest{
+			PlayerID: p1ID,
+			EntityID: p1e1ID,
+			Type:     "attack",
+			TargetCoords: []api.Position{
+				{X: 1, Y: 1},
+			},
+		},
+	})
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/internal/arena/"+arenaID+"/action", bytes.NewBuffer(attackReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	log.Printf("ATTACK status: %d, response: %s", w.Code, w.Body.String())
+
+	if w.Code == http.StatusOK {
+		var resp api.ArenaActionResponseMessage
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Contains(t, resp.Message, "attack")
+	} else {
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	}
+
+	// 4. Pass turn
+	log.Printf("Executing PASS action...")
+	passReqBody, _ := json.Marshal(api.ArenaActionMessage{
+		RequestID: uuid.NewString(),
+		Data: api.ArenaActionRequest{
+			PlayerID: p1ID,
+			EntityID: p1e1ID,
+			Type:     "pass",
+		},
+	})
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/internal/arena/"+arenaID+"/action", bytes.NewBuffer(passReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	log.Printf("PASS status: %d, response: %s", w.Code, w.Body.String())
+	assert.Equal(t, http.StatusOK, w.Code, "Pass action should succeed")
+	waitForWebhook(t, webhookEvents, "turn.started")
+}
+
+func waitForWebhook(t *testing.T, events chan map[string]interface{}, expectedType string) {
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case event := <-events:
+			if event["event_type"] == expectedType {
+				return
+			}
+		case <-timeout:
+			t.Fatalf("Timed out waiting for webhook event: %s", expectedType)
+		}
+	}
 }

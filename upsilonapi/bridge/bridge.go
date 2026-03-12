@@ -36,11 +36,15 @@ func Get() *ArenaBridge {
 }
 
 func (b *ArenaBridge) StartArena(start api.ArenaStartRequest) (uuid.UUID, *grid.Grid, []entity.Entity, turner.TurnState, error) {
-	battleArena := battlearena.NewBattleArena(uuid.MustParse(start.MatchID))
+	matchID := uuid.MustParse(start.MatchID)
+	battleArena := battlearena.NewBattleArena(matchID)
 	battleArena.Metadata["CallbackURL"] = start.CallbackURL
 
+	// Ensure Ruler ID matches MatchID as per caller expectations
+	battleArena.Ruler.ID = matchID
+
 	b.mu.Lock()
-	b.arenas[battleArena.Uuid] = battleArena
+	b.arenas[matchID] = battleArena
 	b.mu.Unlock()
 
 	// this bypass actor's owning resource, we should probably use the SetGrid message instead (doesn't exist yet).
@@ -111,7 +115,7 @@ func (b *ArenaBridge) StartArena(start api.ArenaStartRequest) (uuid.UUID, *grid.
 	}
 
 	// this is bad, because we access data directly, bypassing the actor... we should probably poll for appropriate data so that we're sure to have readonly copies.
-	return battleArena.Ruler.ID,
+	return matchID,
 		battleArena.Ruler.GameState.Grid,
 		res,
 		battleArena.Ruler.GameState.Turner.GetTurnState(),
@@ -174,5 +178,8 @@ func (b *ArenaBridge) GetArena(id uuid.UUID) (*ruler.Ruler, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	r, ok := b.arenas[id]
+	if !ok {
+		return nil, false
+	}
 	return r.Ruler, ok
 }
