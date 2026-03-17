@@ -6,7 +6,8 @@ version: 1.0
 status: DRAFT
 priority: CORE
 tags: [api, json, envelope, standard]
-parents: []
+parents:
+  - [[api_request_id]]
 dependents:
   - [[api_laravel_gateway]]
   - [[api_go_battle_engine]]
@@ -22,7 +23,7 @@ Every JSON payload transmitted over HTTP or WebSocket between system units MUST 
 
 ```json
 {
-  "request_id": "018f5a...", // String: UUIDv7. Identifies the specific transaction flow.
+  "request_id": "018f5a...", // String: UUIDv7. Detailed in [[api_request_id]].
   "message": "...",         // String: A one-liner intent, status summary, or error message.
   "success": true,          // Boolean: Indicates if the operation was successful.
   "data": {},               // Object/Array: The core JSON payload of the query or response.
@@ -31,11 +32,7 @@ Every JSON payload transmitted over HTTP or WebSocket between system units MUST 
 ```
 
 ### Constraints:
-*   **Originator generates the ID:** The entity taking the primary initiative generates the `request_id` (a UUID v7). 
-    *   *Vue* generates it for user-driven interactions.
-    *   *Laravel* forwards this exact ID to the Go engine when proxying.
-    *   *Go* maintains this ID in its immediate `200 Accepted` reply.
-    *   *Go* generates an entirely *new* `request_id` when it initiates asynchronous webhooks/notifications back to Laravel.
+*   **Request Identification:** Every envelope MUST carry a `request_id` following the rules defined in [[api_request_id]].
 
 ## TECHNICAL INTERFACE (The Bridge)
 *   **API Endpoint:** Universal (Global Request/Response Middleware)

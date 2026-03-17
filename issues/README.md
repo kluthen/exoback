@@ -2,6 +2,7 @@
 
 | Ref     | File                                                                                                                 | Severity | Status   | Summary                                                                         |
 | ------- | -------------------------------------------------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------- |
+| ISS-019 | [ISS-019_20260316_battleui_api_todo_list.md](ISS-019_20260316_battleui_api_todo_list.md) | Medium | Open | Consolidate and track BattleUI API TODOs and gaps. |
 | ISS-018 | [20260312_match_participant_access_control.md](20260312_match_participant_access_control.md) | Critical | Open | Lack of authorization checks on battle match interactions. |
 | ISS-017 | [20260312_action_player_id_usurpation.md](20260312_action_player_id_usurpation.md) | Critical | Open | Security risk: player_id in actions can be usurped by any auth user. |
 | ISS-016 | [20260312_character_upgrade_constraints.md](20260312_character_upgrade_constraints.md) | High | Open | Character upgrades bypass progression win/point constraints. |
@@ -16,3 +17,8 @@
 | ISS-003 | [ISS-003_20260305_upsilonbattle_missing_teams.md](ISS-003_20260305_upsilonbattle_missing_teams.md)                   | Medium   | Open     | Team management is missing from the battle logic.                               |
 | ISS-002 | [ISS-002_20260305_upsilonbattle_api_gap.md](ISS-002_20260305_upsilonbattle_api_gap.md)                               | High     | Resolved | Discrepancy between battle arena API and high-level requirements.               |
 | ISS-001 | [ISS-001_20260305_upsilonbattle_mechanics_gap.md](ISS-001_20260305_upsilonbattle_mechanics_gap.md)                   | Medium   | Open     | Inconsistencies in battle mechanics implementation.                             |
+| ISS-020 | [ISS-020_20260316_production_docker_setup.md](ISS-020_20260316_production_docker_setup.md)                             | Medium   | Resolved | Simplified MVP Docker Infrastructure (PHP 8.4, Go 1.25, Postgres 18).          |
+| ISS-021 | [ISS-021_20260316_sanctum_token_sliding_ttl.md](ISS-021_20260316_sanctum_token_sliding_ttl.md)                       | Medium   | Open     | Missing 15-minute sliding TTL for Sanctum tokens.                              |
+| ISS-022 | [ISS-022_20260316_battleui_error_handling.md](ISS-022_20260316_battleui_error_handling.md)                             | High     | Open     | Improper major error handling (HTML instead of JSON).                          |
+| ISS-023 | [ISS-023_20260316_logging_tag_traceability.md](ISS-023_20260316_logging_tag_traceability.md) | High | Open | Ensure all logs are tagged with Request ID for cross-service tracing. |
+| ISS-024 | [Ref_20260316_battleui_api_responder_inconsistency.md](Ref_20260316_battleui_api_responder_inconsistency.md) | Medium | Open | BattleUI ApiResponder Inconsistency and Underuse. |

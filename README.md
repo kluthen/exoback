@@ -44,6 +44,8 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 
 | Name | Date | Status | Severity | Oneliner |
 |---|---|---|---|---|
+| [Ensure all logs are tagged with Request ID](issues/ISS-023_20260316_logging_tag_traceability.md) | 2026-03-16 | Open | High | The system currently lacks a strictly enforced requirement to tag every log e... |
+| [Improper major error handling in BattleUI](issues/ISS-022_20260316_battleui_error_handling.md) | 2026-03-16 | Open | High | In BattleUI, major internal errors or unhandled exceptions currently return H... |
 | [Security Risk: Lack of Match Participant Access Control](issues/ISS-018_20260312_match_participant_access_control.md) | 2026-03-12 | Open | Critical | Currently, any authenticated user can attempt to act or view the state of ANY... |
 | [Security Risk: Battle Action player_id Usurpation](issues/ISS-017_20260312_action_player_id_usurpation.md) | 2026-03-12 | Open | Critical | The battle action proxy endpoint accepts a `player_id` directly from the requ... |
 | [Arena not destroyed on battle end](issues/ISS-012_20260311_arena_destruction_leak.md) | 2026-03-11 | Open | Medium | Arenas are added to the `ArenaBridge.arenas` map during startup but are never... |
