@@ -27,6 +27,17 @@ services:
     networks:
       - ollama_network
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ./upsilonhub/deploy/otel-collector.yaml:/etc/otel-collector.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - ollama_network
+
   db:
     image: postgres:18
     environment:
