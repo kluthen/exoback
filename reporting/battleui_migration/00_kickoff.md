@@ -73,6 +73,22 @@ still pending: they need the full dev stack up and clients pointed at the `:8085
 *content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
 text at Phase 6 per doc 05 §4.
 
+### Compose review vs the side-by-side architecture (2026-07-04, post-Phase 1)
+
+- **`docker-compose.yaml` (dev): aligned.** otel-collector + cutover `proxy` (caddy, `:8085`
+  front door, `/api/v1/auth/*` → hub `:8090`, rest → Laravel `:8000`); `:8090` exposed. The hub
+  binary runs inside the `app` devcontainer by hand, same as Laravel/vite/engine do.
+- **`docker-compose.ci.yaml`: still pre-migration** (db/db-init/app/ws/engine/tester). To match:
+  add a `hub` service + the proxy, and point `tester` at the proxy (`UPSILON_BASE_URL=http://proxy:8085`)
+  so gate 3 (upsiloncli unmodified) actually exercises the cutover. **Two blockers first:**
+  (1) `upsilonhub` has no Dockerfile yet; (2) `hub -migrate` cannot run against a
+  Laravel-migrated DB — golang-migrate would apply the imported schema over existing tables.
+  Side-by-side CI needs Laravel to keep owning the schema and the hub to apply **River's schema
+  only** (add a river-only migrate mode) until Phase 6 flips ownership.
+- **`docker-compose.prod.yaml`: still pre-migration.** Same gaps as CI; wiring hub+proxy into
+  prod is a rollout decision — needed at the latest by Phase 3 (SSE replaces the `ws` container).
+  At Phase 6, `app`/`ws`/`db-init` collapse into the single `hub` container per the brief.
+
 ## Phase sequence & acceptance gates
 
 Phases 0–6 per doc 02 §5 (skeleton → auth → engine bridge/game proxy → SSE → matchmaking →

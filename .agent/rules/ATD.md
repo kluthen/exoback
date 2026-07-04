@@ -83,7 +83,8 @@ Use this table for `type`, `layer`, and granularity. **Bloat Factor** (0.1-1.0) 
 5. **Evolve:** Run `atd_crawl` before modifying `STABLE` atoms to assess impact.
 
 ### 6. Traceability Tagging
-* **No Global Headers:** Place tags directly above the relevant class, function, or block.
+* **No Global Headers:** Place tags directly above the relevant class, function, or block — never in package/file-level comments.
+* **Tests Tag Tests:** Test files carry `@test-link` only (atop each test function); `@spec-link` is reserved for implementation code.
 * **Discovery:** Use `atd_discover` if unsure where to place tags in undocumented code.
 
 ### 7. Hierarchy & Volatility
