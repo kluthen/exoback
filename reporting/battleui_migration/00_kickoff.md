@@ -52,6 +52,20 @@ Laravel behind a proxy and cut over per endpoint group.
 `.atd.workspace`. All upsilon repos flipped private; umbrella renamed `upsilonumbrella`.
 Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Phase 0 can start.
 
+## Progress ledger
+
+| Phase | Status | Notes |
+|---|---|---|
+| 0 — Skeleton & contracts | **DONE 2026-07-04** (upsilonhub `39dd269`) | Gin + envelope byte-parity (respond pkg, unwrap middleware), enveloped 404/405/panic paths, tracing log format, OTel (otelgin/otelpgx, collector in umbrella compose), injected clock + insert-only River, schema imported verbatim from dev DB (29 migrations → `db/migrations/000001`), testcontainers harness, `ApiResponderTest`+`ErrorHandlingTest` ported and green, code health 0/0. Hub serves on `:8090` during side-by-side; `-migrate` flag applies schema + River. |
+| 1 — Auth + identity | next | `auth/*`, opaque tokens + sliding renewal behind `IdentityService`/`CharacterService`; green `AuthTest`/`GdprTest`/`SanctumTokenRenewalTest`. |
+
+Open caveats: (a) ATD MCP server caches `.atd.workspace` at startup — restart it before running
+`atd_check` against `upsilonhub`; Go spec-links so far only reference surviving atoms
+(`[[upsilonapi:api_standard_envelope]]`, `[[upsilonapi:api_request_id]]`,
+`[[shared:rule_tracing_logging]]`). (b) Playwright/upsiloncli gates become meaningful once
+Phase 1 puts real endpoints behind the proxy. (c) Local umbrella dir is still `upsilon-hub`
+though the GitHub repo is `upsilonumbrella`.
+
 ## Phase sequence & acceptance gates
 
 Phases 0–6 per doc 02 §5 (skeleton → auth → engine bridge/game proxy → SSE → matchmaking →
