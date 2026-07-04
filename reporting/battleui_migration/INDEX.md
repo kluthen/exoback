@@ -26,11 +26,13 @@ depth). The database is portable as-is.
 
 | # | Document | What it answers |
 |---|----------|-----------------|
+| 0 | [00_kickoff.md](00_kickoff.md) | **Start here to execute**: locked decisions (2026-07-04), structural rules, gates, pre-Phase-0 blocker. |
 | 1 | [01_current_state.md](01_current_state.md) | What exists today: every endpoint, event, model, migration, test, and the WS topology. The complete feature inventory. |
 | 2 | [02_migration_strategy.md](02_migration_strategy.md) | Target Go/Gin architecture, library choices, layer-by-layer mapping, phasing, effort, and risks — including the **Identity** and **Economy** service extractions and the post-extraction data-ownership boundary. |
 | 3 | [03_websocket_strategy.md](03_websocket_strategy.md) | The core motivation. Reverb/Pusher today, the three options for Go, and the frontend impact. |
 | 4 | [04_observability.md](04_observability.md) | OpenTelemetry integration design (traces/metrics/logs) for the new service and how it threads into the existing stack. |
 | 5 | [05_atd_rewiring.md](05_atd_rewiring.md) | Carrying the 200 `@spec-link [[atom]]` traceability annotations and ATD project registration across the rewrite. |
+| 6 | [06_v3_platform_constraints.md](06_v3_platform_constraints.md) | Forward-looking v3.0 constraints (multi-game platform with a shared world, HTTP→MQ transition, further service extractions) and how they shape — but do not expand — the migration. |
 
 ## Headline numbers (measured)
 

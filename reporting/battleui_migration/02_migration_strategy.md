@@ -27,15 +27,30 @@ no second container, no Pusher**. This is the structural win.
 | HTTP router | **Gin** | Per user. Mature, fast, huge middleware ecosystem. |
 | DB access | **pgx/v5** + **sqlc** (or GORM) | `sqlc` gives type-safe queries from SQL, matching the "strict typing" ethos; GORM if you prefer ActiveRecord familiarity. pgx is the Postgres driver either way. |
 | Migrations | **golang-migrate** or **goose** | Port the 28 Laravel migrations to plain SQL up/down. |
-| WebSocket | **nhooyr/coder websocket** (`github.com/coder/websocket`) or **gorilla/websocket** | Native sockets; build a small hub. See doc 03. |
+| Realtime | **RESOLVED: SSE** — stdlib `net/http` + flusher, no WS library needed | Doc 03, resolved 2026-07-04. |
 | Auth tokens | **lestrrat-go/jwx** (JWT) *or* opaque tokens in DB | Replaces Sanctum; see §4. |
 | Validation | **go-playground/validator** | Struct-tag validation ≈ FormRequests. |
 | Config | **viper** or stdlib + `envconfig` | Read existing `.env` keys. |
 | Observability | **OpenTelemetry Go SDK** (`otelgin`, `otelpgx`, `otelhttp`) | Doc 04. |
 | Tests | stdlib `testing` + **testify** + **testcontainers-go** | Postgres-backed feature tests mirroring the 74 PHP tests. |
 
-> Recommendation: **pgx + sqlc + golang-migrate**. It keeps SQL explicit (good for the
-> JSONB-heavy `game_state_cache`) and avoids ORM surprises around the optimistic-version logic.
+> **RESOLVED (2026-07-04): pgx + sqlc + golang-migrate** — no ORM. Keeps SQL explicit (good
+> for the JSONB-heavy `game_state_cache`) and avoids ORM surprises around the
+> optimistic-version logic.
+
+### Package layout & the communication seam (v3.0 constraint — see doc 06)
+
+Structure the binary as **domain packages behind interfaces** — per the platform architecture
+(`reporting/v3_platform_architecture.md` §9, which supersedes this section on layout naming):
+`internal/platform/{identity,character,economy,inventory,…}` + `internal/games/battle/…` +
+`internal/gateway` + `internal/events` — with **all transport implementations in a dedicated
+layer** (`internal/transport/…`): the typed `upsilonapi` HTTP client, future clients
+to extracted services, and eventually MQ producers/consumers. Domain code never imports a
+transport; contracts are plain message structs (cross-service ones in `upsilontypes`) carrying
+`request_id`/`traceparent` as metadata. This is what makes the planned HTTP → MQ transition and
+the further service extractions (doc 06) implementation swaps rather than refactors. Internally,
+prefer event-shaped flow where it is already natural: the webhook handler publishes onto a small
+in-process event bus that persistence, credit award, and the WS hub subscribe to.
 
 ## 2. Layer-by-layer mapping
 
@@ -53,7 +68,7 @@ no second container, no Pusher**. This is the structural win.
 | Sanctum | JWT or opaque-token middleware | §4 |
 | Exception handler | Gin recovery + error-to-envelope middleware | Map error types → status codes |
 | Artisan migrate / seed | golang-migrate + a seed command | Port `DatabaseSeeder` family |
-| Queue (`jobs` table) | goroutines / ticker | Matchmaking can move from request-time to a background tick if desired |
+| Queue (`jobs` table) | **River** (Postgres job queue) + injected world clock | Platform arch §13 decision applied to the migration: background work (matchmaking tick, token cleanup) lands as River jobs with the injected clock from Phase 0 — not ad-hoc goroutines — because this becomes the platform's time infrastructure (arch §7) |
 
 ## 3. The frontend question (decisive for effort)
 
@@ -73,6 +88,12 @@ Three viable stances, in increasing ambition:
 **The WebSocket transport is the real frontend coupling, not Inertia** — see doc 03. Decide
 that first; the Inertia choice is minor by comparison.
 
+> **Settled by the platform architecture (2026-07-04): option 2, and no `gonertia` at all.**
+> The v3.0 common admin backend (arch doc §4) moves admin to a separate SPA on `/admin/v1`
+> facets — so during the migration, build the 3 admin pages' data as facet-shaped API
+> endpoints from the start and serve the SPA statically. Investing in an Inertia adapter
+> would be building a bridge to a shore we're leaving.
+
 ## 4. Auth migration (Sanctum → Go)
 
 Sanctum today = opaque DB tokens, 15-min expiry, sliding renewal, `ws_channel_key` rotated per
@@ -83,8 +104,9 @@ login. Two paths:
 - **JWT (stateless):** simpler horizontally but loses server-side revocation and complicates the
   exact sliding-renewal semantics the tests assert.
 
-**Recommendation:** opaque tokens — it preserves `SanctumTokenRenewalTest` behaviour and the
-per-login channel-key rotation that gates WS auth, with no frontend change.
+**RESOLVED (2026-07-04): opaque tokens** — preserves `SanctumTokenRenewalTest` behaviour with
+no frontend change; post-extraction (`upsilonauth`), consumers add a short-lived validation
+cache. (The per-login `ws_channel_key` rotation may retire with the SSE decision — doc 03.)
 
 ## 5. Phasing (incremental, each phase shippable & testable)
 
@@ -98,14 +120,19 @@ per-login channel-key rotation that gates WS auth, with no frontend change.
 - **Phase 1 — Auth + identity.** `auth/*`, profile, characters, Sanctum-equivalent tokens.
   Gate behind proxy for these routes. Green `AuthTest`/`GdprTest`/`SanctumTokenRenewalTest`.
   **Build all auth/account access behind an `IdentityService` interface** (no direct `users`-table
-  reads from other packages) so Phase 7 is an implementation swap, not a refactor.
+  reads from other packages) so Phase 7 is an implementation swap, not a refactor. Apply the same
+  treatment to characters: a **`CharacterService` interface** in front of all roster/profile access —
+  characters are a v3.0 extraction candidate (doc 06 §2.3).
 - **Phase 2 — Engine bridge + game proxy.** Typed `upsilonapi` client (sharing `upsilontypes`),
   `game/*`, webhook ingestion, `BoardStateResource` masking. Green `BattleProxyTest`.
-- **Phase 3 — WebSocket hub.** Replace Reverb (doc 03). This is where the container count drops.
-  Validate with Playwright E2E against the live arena.
+- **Phase 3 — Realtime (SSE).** Replace Reverb with the SSE stream (doc 03, resolved). This is
+  where the container count drops. Validate with Playwright E2E against the live arena.
 - **Phase 4 — Matchmaking.** The thorniest logic (modes, AI gen, resurrection/ISS-054). Green the
   full matchmaking suite. Resurrection touches the engine + JSONB cache — test hard.
 - **Phase 5 — Economy/loadout + admin.** Shop, inventory, equipment, skills, leaderboard, admin CRUD.
+  **Port shop/inventory *thin*** — behavior-parity handlers over the `EconomyService`/inventory
+  seams, no extra polish: v3.0 reshapes shop into a market vendor and items into the shared
+  registry (arch doc §5.1, open question #5), so depth invested here is depth rewritten there.
   **Route every credit/wallet/market operation through an `EconomyService` interface** (the credit
   ledger is never mutated by ad-hoc `increment` calls scattered across handlers) so Phase 8 is a
   clean cut. Note the existing coupling: `GameController` awards credits and equipment references
@@ -136,6 +163,8 @@ per-login channel-key rotation that gates WS auth, with no frontend change.
   inventory list. Consumers: `GameController` credit awards, shop purchase, equipment ownership
   checks. **Play stats stay gateway-side** — `total_wins`/`losses`/`ratio` and the leaderboard are
   battle concerns, not economy; only money/items move.
+- **Phase 9 (candidate, unscheduled) — Extract Characters/Profile service.** See doc 06 §2.3;
+  the `CharacterService` seam from Phase 1 is the preparation, extraction is a v3.0-era decision.
 
 ### Data-ownership boundary (post-extraction)
 
@@ -143,7 +172,7 @@ per-login channel-key rotation that gates WS auth, with no frontend change.
 |---|---|---|
 | **Identity svc** | `users` (account/auth cols), `personal_access_tokens` | System of record for *who*; issues/validates tokens |
 | **Economy svc** | `credit_transactions`, `inventory_transactions`, `shop_items`, `player_inventories`, wallet balance | System of record for *money & items* |
-| **Hub (gateway)** | `characters`, `game_matches`, `match_participants`, `matchmaking_queues`, `character_equipments`, `skill_templates`, `character_skills`, play-stats columns | Gameplay truth; references Identity (player) + Economy (items) by id across the seam |
+| **Hub (gateway)** | `characters`, `game_matches`, `match_participants`, `matchmaking_queues`, `character_equipments`, `skill_templates`, `character_skills`, play-stats columns | Gameplay truth; references Identity (player) + Economy (items) by id across the seam. Hub ownership of `characters` is **provisional** — v3.0 extraction candidate (doc 06 §2.3); reference characters by UUID and avoid new joins into `characters` |
 
 > The one cross-cutting wrinkle: `character_equipments` (gameplay, hub) references inventory items
 > (economy). Equip/unequip becomes a hub→economy ownership check rather than a SQL join — design
@@ -156,7 +185,7 @@ per-login channel-key rotation that gates WS auth, with no frontend change.
 | 0 Skeleton | S | Envelope/round-trip parity subtleties |
 | 1 Auth | M | Sliding-renewal exactness; GDPR anonymise semantics |
 | 2 Game proxy | M | **Fog-of-war masking** fidelity; envelope passthrough of engine errors |
-| 3 WebSocket | **L** | Pusher-protocol vs. native transport decision (frontend impact) |
+| 3 Realtime (SSE) | M (was L — transport decision now made) | Reconnect/replay fidelity mid-match; proxy buffering; per-recipient masking parity |
 | 4 Matchmaking | **L** | AI generation parity; **arena resurrection (ISS-054)** correctness |
 | 5 Economy/admin | M | Breadth (many endpoints), credit-ledger tx integrity |
 | 6 Cutover | S | Ops/runbook, data continuity (same DB → low) |
@@ -168,7 +197,11 @@ per-login channel-key rotation that gates WS auth, with no frontend change.
 
 **De-risking levers:** (a) shared DB side-by-side running; (b) the 74 PHP tests as the
 acceptance oracle — port them *first* per phase; (c) Playwright E2E as the cross-stack gate;
-(d) the Postman collections (`Upsilon_Battle.postman_collection.json`) as additional contract checks.
+(d) the Postman collections (`Upsilon_Battle.postman_collection.json`) as additional contract checks;
+(e) **upsiloncli as the almost-E2E harness** — its existing battleui scripting must stay green
+across the cutover (same envelope, same endpoints), which makes it a free per-phase acceptance
+gate; it is slated to grow per-domain clients for all platform APIs in v3.0,
+so keep its client layer per-endpoint-group rather than one monolithic client (arch doc §13.4).
 
 ## 7. What gets *deleted* by this migration
 

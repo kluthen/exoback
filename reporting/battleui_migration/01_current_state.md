@@ -117,9 +117,9 @@ rejections (e.g. 412) are preserved (envelope passthrough), connection failures 
   as envelopes; structured log line `[ts] [ref_id] [endpoint] message`; 500s sanitised unless debug.
   Atom `[[rule_tracing_logging]]`.
 - **Sanctum token renewal** (`SanctumTokenRenewal`): tokens issued 15-min; sliding renewal at
-  10–15 min injects new token into response `meta.token`. Atom `[[mech_sanctum_token_renewal]]`.
+  10–15 min injects new token into response `meta.token`. Atom `[[mech_sanctum_token_renewal]]`. Sanctum equivalent solution must be found.
 - **Health**: `GET /up` (`[[api_laravel_health_check]]`).
-- **Inertia shared props** (`HandleInertiaRequests`): shares `auth.user`.
+- **Inertia shared props** (`HandleInertiaRequests`): shares `auth.user`. Go equivalent must be found.
 
 ## 6. Data model (PostgreSQL — ported as-is)
 

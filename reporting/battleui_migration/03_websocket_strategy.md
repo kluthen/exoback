@@ -78,9 +78,26 @@ choose what it speaks.** Three options:
 > (doc 04) cleaner since every push is a normal HTTP span. Avoid Option B — re-implementing
 > Pusher in Go preserves the exact dependency the migration aims to delete.
 
-**Action item for the user:** this is the one genuinely architectural fork. Pick A or C before
-Phase 3. The choice determines whether the frontend change is "~4 files" (A/C) or "~0 files but
-a protocol implementation" (B).
+> **RESOLVED (2026-07-04, Bastien): Option C — SSE.** The gameplay strategy does not depend on
+> high-speed bidirectional communication: client-issued requests stay on the plain REST API,
+> and only a limited set of events needs server push.
+
+### Implementation notes for Phase 3 (now the SSE phase)
+
+- `GET /events` — authenticated like any API call; `text/event-stream`; heartbeat comment
+  every ~25s (proxy-buffering guard); named events mirroring today's broadcasts
+  (`board.updated`, `match.found`).
+- **Per-recipient fog-of-war masking (§4) is unchanged**: one stream per user means the
+  masked payload is rendered per connection exactly as it would have been per WS socket.
+- `Last-Event-ID` + a short server-side replay buffer so a mid-match reconnect resumes
+  seamlessly (EventSource retries automatically — the replay buffer is our half of the deal).
+- Frontend: replace `laravel-echo`/`pusher-js` with a small `EventSource` wrapper keeping the
+  `.private(channel).listen(event, cb)` surface the 3 composables use (~4 files, as scoped).
+- Simplification candidate: with a token-authenticated per-user stream, the rotating
+  `ws_channel_key` may retire (its job was Pusher channel auth). Decide in Phase 3; it touches
+  the `users` schema and login flow, so if kept it must be for a reason, not inertia.
+- Future client→server push (if ever needed) is a new REST/WebSocket endpoint *beside* SSE,
+  not a rework of it — acceptable trade accepted with this decision.
 
 ## 4. Channel auth & masking carry over directly
 
