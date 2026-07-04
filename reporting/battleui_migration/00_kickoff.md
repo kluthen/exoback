@@ -45,11 +45,12 @@ Laravel behind a proxy and cut over per endpoint group.
 6. **Port shop/inventory thin** — parity only; v3.0 reshapes them into market/registry.
 7. Economy math in `int64` base units; no floats in money paths.
 
-## Pre-Phase-0 blocker
+## Pre-Phase-0 blocker — CLEARED 2026-07-04
 
-**Repo restructure** (arch §14, still open): create the `upsilonhub` GitHub repo, add as
-submodule to the umbrella, wire `go.work`, register the ATD project. Settle the §14 table
-with Bastien first.
+**Repo restructure** (arch §14, settled): `ecumeurs/upsilonhub` created (private, module
+`github.com/ecumeurs/upsilonhub`), added as submodule, wired into `go.work` and
+`.atd.workspace`. All upsilon repos flipped private; umbrella renamed `upsilonumbrella`.
+Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Phase 0 can start.
 
 ## Phase sequence & acceptance gates
 

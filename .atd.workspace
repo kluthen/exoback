@@ -1,5 +1,5 @@
 {
-  "workspace_name": "upsilon-hub",
+  "workspace_name": "upsilonumbrella",
   "workspace_root": ".",
   "projects": [
     {
@@ -9,6 +9,10 @@
     {
       "name": "upsilonapi",
       "path": "upsilonapi"
+    },
+    {
+      "name": "upsilonhub",
+      "path": "upsilonhub"
     },
     {
       "name": "upsilonbattle",

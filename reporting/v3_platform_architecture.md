@@ -319,6 +319,13 @@ Playwright/CLI-testable:
    only cross-front participants (§6).
 9. **Narrative authoring: hand-authored YAML/JSON graphs** for the seed; Ink/Twine compile
    step to be explored later — the graph format must not preclude it (§13.2).
+10. **Repo restructure (§14): settled as written**, with three refinements — all upsilon
+    repos flipped **private**; the Vue SPA move out of battleui is **deferred to Phase 3+**
+    (Phase 0 is Go-only, avoids forking the SPA while Laravel still serves it); the umbrella
+    repo renamed **`upsilonumbrella`** (was `upsilon-hub`) to avoid the near-collision with
+    the new `upsilonhub` Go repo. `ecumeurs/upsilonhub` created private, seeded
+    (`module github.com/ecumeurs/upsilonhub`), added as submodule, wired into `go.work` and
+    `.atd.workspace`.
 
 ### Still open
 
@@ -328,9 +335,7 @@ Playwright/CLI-testable:
    support-slot concept).
 3. **City tiering & inter-city communication limits** — deferred design; world model assumes
    information does not travel freely.
-4. **Repository / project-tree restructure** — whole tree rework + GitHub repos to create
-   (§14); concrete proposal must be settled **before migration Phase 0**.
-5. **Onboarding friction under presence gating** — starting city, first travel experience.
+4. **Onboarding friction under presence gating** — starting city, first travel experience.
 
 ## 11. ATD & governance
 
@@ -423,11 +428,11 @@ machinery** by hand (event bus, effects resolution, narrative graph, world clock
 state machine) — these encode the product's rules, are small in Go, and per Bastien "we will
 build all this by hand if need be" is an accepted cost.
 
-## 14. Repository & project-tree restructure (flagged 2026-07-04, proposal to settle before Phase 0)
+## 14. Repository & project-tree restructure (SETTLED 2026-07-04 — see §10 Resolved #10)
 
-Bastien: the whole tree/project structure may need rework, with appropriate GitHub repos
-created. This must be settled **before migration Phase 0** — the Go code needs a home.
-Working proposal to refine:
+Settled as written below, with refinements: all upsilon repos private; SPA move deferred to
+Phase 3+; umbrella renamed `upsilonumbrella`. `ecumeurs/upsilonhub` exists and is wired in.
+The table as approved:
 
 | Repo | Content | Fate |
 |---|---|---|

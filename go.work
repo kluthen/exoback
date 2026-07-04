@@ -4,6 +4,7 @@ use (
 	./upsilonapi
 	./upsilonbattle
 	./upsiloncli
+	./upsilonhub
 	./upsilonmapdata
 	./upsilonmapmaker
 	./upsilonserializer

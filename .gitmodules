@@ -25,3 +25,6 @@
 [submodule "upsilonaws"]
 	path = upsilonaws
 	url = git@github.com:ecumeurs/upsilonaws.git
+[submodule "upsilonhub"]
+	path = upsilonhub
+	url = ../upsilonhub.git
