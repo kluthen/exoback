@@ -57,14 +57,21 @@ Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Pha
 | Phase | Status | Notes |
 |---|---|---|
 | 0 — Skeleton & contracts | **DONE 2026-07-04** (upsilonhub `39dd269`) | Gin + envelope byte-parity (respond pkg, unwrap middleware), enveloped 404/405/panic paths, tracing log format, OTel (otelgin/otelpgx, collector in umbrella compose), injected clock + insert-only River, schema imported verbatim from dev DB (29 migrations → `db/migrations/000001`), testcontainers harness, `ApiResponderTest`+`ErrorHandlingTest` ported and green, code health 0/0. Hub serves on `:8090` during side-by-side; `-migrate` flag applies schema + River. |
-| 1 — Auth + identity | next | `auth/*`, opaque tokens + sliding renewal behind `IdentityService`/`CharacterService`; green `AuthTest`/`GdprTest`/`SanctumTokenRenewalTest`. |
+| 1 — Auth + identity | **DONE 2026-07-04** | All `auth/*` endpoints (login, admin login, register+roster, logout, update, password, export, delete) behind `IdentityService`/`CharacterService` seams; Sanctum-wire-compatible opaque tokens (`{id}\|{40 chars+crc32b}`, sha256 stored, `tokenable_type` kept as the Laravel FQCN so tokens interop across both stacks); sliding renewal (10–15 min → `meta.token`, 20 s grace) via injected clock; Laravel-parity validation (422 `meta.errors`), bcrypt (Go `$2a$` ⇄ PHP `$2y$` verified both ways); sqlc introduced (`sqlc.yaml`, queries per domain package); `AuthTest`+`GdprTest`+`SanctumTokenRenewalTest` re-expressed in Go and green (11 tests, shared testcontainer + fake-clock time-warping; renewal suite drives `/auth/export` until matchmaking exists); cutover proxy added (`caddy` on `:8085`, `/api/v1/auth/*` → hub `:8090`, rest → Laravel). |
+| 2 — Engine bridge + game proxy | next | Typed `upsilonapi` client sharing `upsilontypes`; `game/*`; webhook ingestion; `BoardStateResource` masking. Green `BattleProxyTest`. |
 
-Open caveats: (a) ATD MCP server caches `.atd.workspace` at startup — restart it before running
-`atd_check` against `upsilonhub`; Go spec-links so far only reference surviving atoms
-(`[[upsilonapi:api_standard_envelope]]`, `[[upsilonapi:api_request_id]]`,
-`[[shared:rule_tracing_logging]]`). (b) Playwright/upsiloncli gates become meaningful once
-Phase 1 puts real endpoints behind the proxy. (c) Local umbrella dir is still `upsilon-hub`
-though the GitHub repo is `upsilonumbrella`.
+Open caveats: (a) ATD MCP server still runs a pre-restructure workspace cache — restart it, then
+rerun `atd_check`/`atd_test_links` for `upsilonhub` (Phase 1 links were validated mechanically:
+all 18 `[[project:atom]]` references resolve to existing atoms; note the auth/GDPR/character atoms
+live in `upsilonapi`/`upsilonbattle`/`upsilontypes`/`shared`, *not* in `battleui/docs` — battleui's
+own corpus is frontend-only). Two PHP spec-links were dangling and are re-anchored/dropped in Go:
+`uc_player_registration_generate_characters` → `[[shared:uc_player_registration]]`,
+`entity_character_allocate_hp` → dropped (no such atom anywhere). (b) Playwright/upsiloncli gates
+still pending: they need the full dev stack up and clients pointed at the `:8085` proxy front door
+(only the DB container was running when Phase 1 landed). (c) Local umbrella dir is still
+`upsilon-hub` though the GitHub repo is `upsilonumbrella`. (d) `mech_sanctum_token_renewal` atom
+*content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
+text at Phase 6 per doc 05 §4.
 
 ## Phase sequence & acceptance gates
 

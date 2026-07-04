@@ -21,9 +21,23 @@ services:
       - "8080:8080"
       - "5173:5173"
       - "8081:8081"
+      - "8090:8090"
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    networks:
+      - ollama_network
+
+  proxy:
+    # Side-by-side cutover proxy: /api/v1/auth/* → hub (:8090), rest → Laravel
+    # (:8000). Front door for the migration is :8085.
+    image: caddy:2-alpine
+    depends_on:
+      - app
+    volumes:
+      - ./upsilonhub/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      - "8085:8085"
     networks:
       - ollama_network
 
