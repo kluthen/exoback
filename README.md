@@ -159,6 +159,7 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 
 | Name | Date | Status | Severity | Oneliner |
 |---|---|---|---|---|
+| [Human player turns in PVE matches sometimes silently auto-passed by the engine](issues/ISS-101_20260622_pve_human_turn_silently_autopassed.md) | 2026-06-22 | Open | High | In some `1v1_PVE` matches, the human player's queued turns are silently auto-... |
 | [Devcontainer lost WebGL — Playwright 3D visual specs cannot render](issues/ISS-100_20260616_devcontainer_webgl_playwright_visual.md) | 2026-06-16 | Open | Medium | Headless Chromium in the current devcontainer **cannot create a WebGL context... |
 | [Action Endpoint Segregation](issues/ISS-090_20260427_action_endpoint_segregation.md) | 2026-04-27 | Open | Medium | Currently, all tactical actions (move, attack, skill, pass) are funneled thro... |
 | [Deterministic Daily Random Shop](issues/ISS-089_20260426_mechanic_random_shop_algorithm.md) | 2026-04-26 | Open | Medium | Implementation of a daily rotating shop system that provides a deterministic ... |

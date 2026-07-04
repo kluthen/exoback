@@ -20,6 +20,7 @@ These rules are non-negotiable for all implementation work in Upsilon Hub.
 - **Precision Testing**: Always use `scripts/trigger_one_ci_test.sh` for targeted scenario validation.
 - **Unit Tests**: `run_all_unit_tests.sh` is lightweight and should be run frequently during refactoring.
 - **Isolation**: Testing is meant to test production code. Avoid adding "test-only" logic to production files unless absolutely necessary for observability.
+- **Reproduce Error as Test First**: when a new error is encountered, ensure a test is created at the nearest concerned module that will reproduce the error. Only then, attempt to solve the error.
 
 ## 4. Artifact Management
 - **Binary Output**: All compiled binaries must be placed in the `bin/` directory of their respective service.

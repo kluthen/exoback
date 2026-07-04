@@ -1,12 +1,3 @@
 {
-  "mcpServers": {
-    "atd": {
-      "type": "stdio",
-      "command": "/home/vscode/.local/bin/atd",
-      "args": [
-        "serve"
-      ],
-      "env": {}
-    }
-  }
+  "mcpServers": {}
 }

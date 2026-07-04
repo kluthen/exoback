@@ -16,6 +16,11 @@
 #   --ref <git-ref>     Branch / tag / SHA to check out (default: current branch).
 #   --dir <path>        Target clone directory (default: ../upsilon-hub-ci).
 #   --repo <url>        Repo to clone (default: this repo's origin remote).
+#   --local             Source the hub and every submodule from this local
+#                       checkout instead of their remotes, so committed-but-
+#                       unpushed local changes are picked up without needing
+#                       a push first (uncommitted changes still aren't seen —
+#                       git clone only reads from history, not the worktree).
 #   --fresh             Remove the target dir and re-clone from scratch.
 #   --stages <list>     Comma-separated subset of: build,unit,integration
 #                       (default: build,unit,integration).
@@ -43,6 +48,7 @@ FRESH=0
 STAGES="build,unit,integration"
 SKIP_PLAYWRIGHT=0
 KEEP_STACK=0
+LOCAL_SOURCE=0
 
 COMPOSE="docker compose -f docker-compose.ci.yaml"
 
@@ -71,6 +77,7 @@ while [ $# -gt 0 ]; do
         --ref)             REF="${2:?--ref needs a value}"; shift 2 ;;
         --dir)             TARGET_DIR="${2:?--dir needs a value}"; shift 2 ;;
         --repo)            REPO_URL="${2:?--repo needs a value}"; shift 2 ;;
+        --local)           LOCAL_SOURCE=1; shift ;;
         --fresh)           FRESH=1; shift ;;
         --stages)          STAGES="${2:?--stages needs a value}"; shift 2 ;;
         --skip-playwright) SKIP_PLAYWRIGHT=1; shift ;;
@@ -96,7 +103,9 @@ check_prereqs() {
     if want_stage integration && [ "$SKIP_PLAYWRIGHT" -eq 0 ]; then
         command -v node >/dev/null 2>&1 || warn "node not found — Playwright tests will be skipped"
     fi
-    [ -n "$REPO_URL" ] || die "Could not determine repo URL; pass --repo <url>"
+    if [ "$LOCAL_SOURCE" -eq 0 ]; then
+        [ -n "$REPO_URL" ] || die "Could not determine repo URL; pass --repo <url> or --local"
+    fi
     ok "Prerequisites satisfied"
 }
 
@@ -105,6 +114,11 @@ check_prereqs() {
 # ----------------------------------------------------------------------------
 prepare_clone() {
     log "Preparing CI checkout at: $TARGET_DIR"
+
+    if [ "$LOCAL_SOURCE" -eq 1 ]; then
+        REPO_URL="$SOURCE_REPO"
+        info "source: local working tree ($REPO_URL — committed state only)"
+    fi
     info "repo: $REPO_URL"
     info "ref:  $REF"
 
@@ -115,22 +129,64 @@ prepare_clone() {
 
     if [ -d "$TARGET_DIR/.git" ]; then
         info "Existing clone found — fetching and resetting to $REF"
+        git -C "$TARGET_DIR" remote set-url origin "$REPO_URL"
         git -C "$TARGET_DIR" fetch --all --prune --tags
         git -C "$TARGET_DIR" checkout -f "$REF"
         # Pull latest if it's a branch (ignore failure for detached tags/SHAs)
         git -C "$TARGET_DIR" pull --ff-only 2>/dev/null || true
-        git -C "$TARGET_DIR" submodule sync --recursive
-        git -C "$TARGET_DIR" submodule update --init --recursive --force
     else
-        git clone --recurse-submodules --branch "$REF" "$REPO_URL" "$TARGET_DIR" 2>/dev/null \
-            || git clone --recurse-submodules "$REPO_URL" "$TARGET_DIR"
+        # --recurse-submodules is intentionally omitted: with --local we need
+        # to repoint each submodule's URL at its local checkout *before* it's
+        # initialized, which relink_submodules_to_local does below.
+        git clone --branch "$REF" "$REPO_URL" "$TARGET_DIR" 2>/dev/null \
+            || git clone "$REPO_URL" "$TARGET_DIR"
         git -C "$TARGET_DIR" checkout -f "$REF"
+    fi
+
+    if [ "$LOCAL_SOURCE" -eq 1 ]; then
+        # NOTE: deliberately skip `submodule sync` here — it re-derives each
+        # submodule's URL from .gitmodules (resolving relative ../foo.git
+        # URLs against the now-local origin) and would clobber the local
+        # overrides relink_submodules_to_local just set.
+        relink_submodules_to_local
+        # Git disables the `file://`/local-path transport for submodules by
+        # default (post CVE-2022-39253). Safe to allow here: TARGET_DIR is a
+        # checkout we just made of SOURCE_REPO, not an untrusted clone.
+        git -c protocol.file.allow=always -C "$TARGET_DIR" submodule update --init --recursive --force
+    else
+        git -C "$TARGET_DIR" submodule sync --recursive
         git -C "$TARGET_DIR" submodule update --init --recursive --force
     fi
 
     local sha
     sha="$(git -C "$TARGET_DIR" rev-parse --short HEAD)"
     ok "Checked out $REF @ $sha"
+}
+
+# ----------------------------------------------------------------------------
+# (--local) Point every submodule at its local checkout under SOURCE_REPO
+# instead of its configured remote (GitHub, or relative ../foo.git URLs that
+# resolve against the *remote* superproject URL). Reads from each submodule's
+# committed history, same as a real clone would — uncommitted changes in the
+# submodule worktrees still won't show up.
+# ----------------------------------------------------------------------------
+relink_submodules_to_local() {
+    log "Relinking submodules to local checkouts (--local)"
+    local entries
+    entries="$(git config -f "$TARGET_DIR/.gitmodules" --get-regexp '\.path$' || true)"
+    [ -n "$entries" ] || { warn "No submodules declared in .gitmodules"; return 0; }
+
+    while IFS=' ' read -r key path; do
+        local name="${key#submodule.}"
+        name="${name%.path}"
+        local src="$SOURCE_REPO/$path"
+        if [ -d "$src/.git" ] || [ -f "$src/.git" ]; then
+            git -C "$TARGET_DIR" config "submodule.${name}.url" "$src"
+            info "  $name -> $src"
+        else
+            warn "  $name: no local checkout at $src, keeping configured URL"
+        fi
+    done <<< "$entries"
 }
 
 # ----------------------------------------------------------------------------
