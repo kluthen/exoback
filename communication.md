@@ -95,7 +95,8 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 | `DELETE` | `/admin/users/{account_name}` | Administrative Soft Delete | [[uc_admin_user_management]] |
 | `GET` | `/admin/history` | List All Match History (Cursor Based) | [[uc_admin_history_management]] |
 | `DELETE` | `/admin/history/purge` | Clean up match history older than 90 days | [[uc_admin_history_management]] |
-| `POST` | `/broadcasting/auth` | WebSocket Channel Authorization | [[api_websocket]] |
+| `GET` | `/events` | Realtime SSE Stream (replaces WS for the SPA, §2.8) | [[api_websocket_game_events]] |
+| `POST` | `/broadcasting/auth` | WebSocket Channel Authorization (legacy Reverb, until cutover) | [[api_websocket]] |
 | `POST` | `/api/webhook/upsilon` | Ingest Engine State Update (Internal) | [[api_go_webhook_callback]] |
 | `GET` | `/admin/shop-items` | List All Shop Items (Admin) | [[api_shop_item_admin_crud]] |
 | `POST` | `/admin/shop-items` | Create New Shop Item (Admin) | [[api_shop_item_admin_crud]] |
@@ -454,32 +455,41 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 - **Output:** `SkillTemplateResource`
 
 
-### 2.8 WebSocket Protocol
+### 2.8 Realtime Stream (SSE)
 
-The Upsilon Battle ecosystem uses **Laravel Reverb** (Pusher-compatible) for real-time updates.
+Real-time updates ride **Server-Sent Events** from the Go hub (migration doc 03, Phase 3).
+The stream replaces the Laravel Reverb/Pusher websocket for the SPA; Reverb stays running
+side-by-side (legacy emitters, rollback) until the Phase 6 cutover.
 
-#### Handshake
-- **URL:** `ws://127.0.0.1:8080/app/{REVERB_APP_KEY}?protocol=7&client=js&version=8.4.0-rc2&flash=false`
-- **Initial Event:** `pusher:connection_established` returns the `socket_id`.
-
-#### `POST /broadcasting/auth`
-- **Specification:** [[api_websocket]]
-- **Intent:** Obtain authorization signature for private channels.
-- **Input:**
-  - `socket_id`: `string`
-  - `channel_name`: `string` (e.g., `private-user.{ws_channel_key}`)
-- **Output:** `{ "auth": "key:signature" }`
-
-#### Subscription Channels
-- `private-user.{ws_channel_key}`: User-specific notifications (MatchFound, Inventory updates).
-- `private-arena.{match_id}`: Real-time tactical state updates for an active match.
+#### `GET /api/v1/events`
+- **Specification:** [[api_websocket_game_events]]
+- **Intent:** One authenticated stream per user carrying all private realtime events
+  (the connection *is* the former `private-user.{ws_channel_key}` channel — no
+  `/broadcasting/auth` handshake, no channel key).
+- **Authentication:** `Authorization: Bearer {token}` — like any API call. Sliding token
+  renewal does not ride the stream; tokens renew on regular REST traffic.
+- **Input (headers):**
+  - `Last-Event-ID`: `{match_id}:{version}` (optional) — on reconnect the hub replays the
+    current board snapshot if newer (only the latest state is persisted; replay is a
+    snapshot, not an event log). Participant-gated.
+- **Output:** `text/event-stream`; each event is `id: {match_id}:{version}`,
+  `event: {event name}`, `data: {Standard JSON Envelope}` with the fog-of-war-masked board
+  state in `data` (masked per recipient, `message: "Board Updated"`).
+- **Heartbeat:** comment frame every ~25s (proxy keep-alive/buffering guard).
 
 #### Key Events
-- `match.found`: Matchmaking success (emitted on user channel).
+- `match.found`: Matchmaking success (Laravel-emitted until Phase 4 ports matchmaking to the
+  hub; until then the dashboard's 5s status polling covers it).
 - `game.started`: Arena initialization complete.
 - `turn.started`: New entity initiative active (starts 30s clock).
 - `board.updated`: Position change, stat change, or successful tactical action (Move, Attack, Pass).
 - `game.ended`: Win condition met or match terminated.
+
+#### Legacy WebSocket (Reverb, until Phase 6 cutover)
+- **Handshake URL:** `ws://127.0.0.1:8080/app/{REVERB_APP_KEY}?protocol=7&client=js&version=8.4.0-rc2&flash=false`
+- **Channel auth:** `POST /broadcasting/auth` ([[api_websocket]]) with `socket_id` +
+  `channel_name` (`private-user.{ws_channel_key}`); returns `{ "auth": "key:signature" }`.
+- The SPA no longer connects to it; `ws_channel_key` rotation persists for interop until cutover.
 
 ### 2.9 Advanced Identity Management
 

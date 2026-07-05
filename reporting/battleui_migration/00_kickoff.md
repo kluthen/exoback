@@ -59,7 +59,8 @@ Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Pha
 | 0 — Skeleton & contracts | **DONE 2026-07-04** (upsilonhub `39dd269`) | Gin + envelope byte-parity (respond pkg, unwrap middleware), enveloped 404/405/panic paths, tracing log format, OTel (otelgin/otelpgx, collector in umbrella compose), injected clock + insert-only River, schema imported verbatim from dev DB (29 migrations → `db/migrations/000001`), testcontainers harness, `ApiResponderTest`+`ErrorHandlingTest` ported and green, code health 0/0. Hub serves on `:8090` during side-by-side; `-migrate` flag applies schema + River. |
 | 1 — Auth + identity | **DONE 2026-07-04** | All `auth/*` endpoints (login, admin login, register+roster, logout, update, password, export, delete) behind `IdentityService`/`CharacterService` seams; Sanctum-wire-compatible opaque tokens (`{id}\|{40 chars+crc32b}`, sha256 stored, `tokenable_type` kept as the Laravel FQCN so tokens interop across both stacks); sliding renewal (10–15 min → `meta.token`, 20 s grace) via injected clock; Laravel-parity validation (422 `meta.errors`), bcrypt (Go `$2a$` ⇄ PHP `$2y$` verified both ways); sqlc introduced (`sqlc.yaml`, queries per domain package); `AuthTest`+`GdprTest`+`SanctumTokenRenewalTest` re-expressed in Go and green (11 tests, shared testcontainer + fake-clock time-warping; renewal suite drives `/auth/export` until matchmaking exists); cutover proxy added (`caddy` on `:8085`, `/api/v1/auth/*` → hub `:8090`, rest → Laravel). |
 | 2 — Engine bridge + game proxy | **DONE 2026-07-05** | Typed engine client (`internal/transport/engineclient`, shares the engine's `stdmessage` envelope; engine rule rejections pass through with `meta.error_key`; `EngineConnectionException` 503 envelope byte-parity, `target_coords` kept raw-passthrough like PHP). `game/*` endpoints with `GameMatchPolicy`-parity authz + entity-ownership gate via `CharacterService.OwnedByPlayer`. `BoardStateResource` masking ported non-mutating (`battle.MaskBoardState`) so one snapshot masks per recipient — pinned by a unit suite. Webhook ingestion with `mech_game_state_versioning` gating (stale/duplicate), `game.ended` resolution (stats + PHP ratio string semantics), Laravel-parity validation. **In-process event bus** (`internal/events`, synchronous — the MQ seam) publishes `battle.BoardUpdated`; SSE fan-out subscribes here at Phase 3. **`EconomyService` seam introduced early** (kickoff rule 3): credit awards are ledger+wallet in one tx, `int64`. `BattleProxyTest` re-expressed (4 tests + a versioning-gate test) and green; full suite green. Proxy routes `/api/v1/game/*` + `/api/webhook/upsilon` → hub; `UPSILON_WEBHOOK_URL` repointed at the proxy front door (`env.example` — real `.env`s must follow). |
-| 3 — Realtime (SSE) | next | `GET /events` stream, heartbeat, `Last-Event-ID` replay, per-connection masking off the bus (doc 03). Container count drops (`ws` retires at cutover). |
+| 3 — Realtime (SSE) | **DONE 2026-07-05** | `GET /api/v1/events` (RequireAuth only — sliding renewal rides REST envelopes, never the stream): the bearer-authenticated stream *is* the user's private channel. **`ws_channel_key` decision (doc 03): retired from the transport**; login keeps rotating it for Laravel interop until Phase 6, column removal then. `internal/gateway/sse` broadcaster subscribes to the bus, masks per recipient (`battle.MaskBoardState`, participants only, exactly the PHP broadcast loop), frame = `id: {match}:{version}`, `event:` = engine event type passthrough, `data:` = the `BoardUpdated::broadcastWith` envelope (`message: "Board Updated"`, uuid7 request_id, `data.match_id` + masked state, empty meta). Heartbeat comment ~25s (`Deps.SSEHeartbeat` shortens it in tests); slow consumers dropped at a 32-frame buffer (reconnect + replay self-heals); broadcaster closed before `server.Shutdown` so streams drain. `Last-Event-ID` replay = current-snapshot-if-newer, participant-gated, named after `_atd_meta.last_event_type`. SPA: `laravel-echo`/`pusher-js`/`@laravel/echo-vue` **removed**; `services/sse.js` is a fetch-based SSE client behind an Echo-compatible facade — fetch, not native `EventSource`, because sliding renewal retires the old token ~20s after renewal, so a URL-frozen token dies mid-session; every reconnect re-reads localStorage and sends `Last-Event-ID`. Composables/components untouched (facade keeps `.private().listen/.subscribed/.error`, `.leave`, and the pusher-shaped `connector.pusher.connection` health object). Caddy routes `/api/v1/events` → hub with `flush_interval -1` (config validated). communication.md §2.8 rewritten + endpoint table + Postman entry added. 6 SSE feature tests over a real httptest server (masked fan-out to 2 recipients, envelope shape, non-participant silence, replay, replay authz, malformed-id degrade, 401) + full suite green; SPA `npm run build` green. |
+| 4 — Matchmaking | next | Queue join/status/leave + match creation as its own operation (kickoff rule 4, scope parameter); hub emits `match.found` on the SSE stream; **arena resurrection (ISS-054)**. Until then the dashboard's 5s status polling covers match redirects (see caveat e). |
 
 Open caveats: (a) ATD MCP server was restarted (workspace cache now post-restructure), but
 `atd_check`/`atd_test_links` scoped to `upsilonhub` still do not attribute *prefixed*
@@ -71,12 +72,21 @@ own corpus is frontend-only). Two PHP spec-links were dangling and are re-anchor
 `uc_player_registration_generate_characters` → `[[shared:uc_player_registration]]`,
 `entity_character_allocate_hp` → dropped (no such atom anywhere). (b) Playwright/upsiloncli gates
 still pending: they need the full dev stack up and clients pointed at the `:8085` proxy front door
-(only the DB container was running when Phase 1 landed). (c) Local umbrella dir is still
+(only the DB container was running when Phase 1 landed); the backlog now includes the Phase 3 SSE
+E2E check (arena receives `board.updated` through the proxy; restart the `proxy` container to pick
+up the Caddyfile change). (c) Local umbrella dir is still
 `upsilon-hub` though the GitHub repo is `upsilonumbrella`. (d) `mech_sanctum_token_renewal` atom
 *content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
-text at Phase 6 per doc 05 §4.
+text at Phase 6 per doc 05 §4; same now for the `api_websocket*` atoms, which still describe the
+Pusher/Reverb protocol while Phase 3 code links to them for their transport-agnostic semantics
+(channels → stream, events, masking) — content rewrite at Phase 6 per doc 05 §4. (e) Until Phase 4,
+`match.found` reaches nobody the SPA listens to (Laravel still broadcasts it to Reverb, but the SPA
+left Reverb): match entry relies on the dashboard's 5-second `/matchmaking/status` polling, a ≤5s
+latency regression accepted for the side-by-side window. (f) `code_health_check.py` reports 56
+errors on upsilonhub — all pre-existing on HEAD (sqlc-generated `*pg` packages and a few Phase 0–2
+files lack ATD links/doc comments); the Phase 3 diff adds zero.
 
-### Session handover (updated 2026-07-05, post-Phase 2 — read before starting Phase 3)
+### Session handover (updated 2026-07-05, post-Phase 3 — read before starting Phase 4)
 
 **Porting conventions established in Phases 0–2** (follow these; they are load-bearing, not style):
 
@@ -105,23 +115,34 @@ text at Phase 6 per doc 05 §4.
   `@test-link` only (ATD.md §6). Validate mechanically (grep links → check
   `<project>/docs/<atom>.atom.md` exists) until the MCP cross-project attribution works.
 
-**Phase 3 (SSE) entry points:**
+**Phase 3 (SSE) conventions now load-bearing:**
 
-- Doc 03 is the resolved design: `GET /events`, heartbeat, `Last-Event-ID` replay,
-  per-recipient masking per connection.
-- The fan-out seam is ready: subscribe to `events.Bus` for `battle.BoardUpdated` (published by
-  `battle.PG.IngestEvent` after persist, synchronously, ordered). The event carries the
-  **unmasked** state incl. `_atd_meta`; mask per connection with `battle.MaskBoardState`
-  (deliberately non-mutating so one snapshot serves N recipients) + `battle.Service.Teams`.
-- Replay source for `Last-Event-ID`: `game_matches.version` + `game_state_cache` (only the
-  latest state is persisted — replay means "send current snapshot if newer", not an event log).
-- Open decision flagged in doc 03: whether per-login `ws_channel_key` rotation survives SSE
-  (identity already rotates it; `identity.User.WsChannelKey` is loaded). Decide early — it
-  shapes the SSE auth/channel model and Laravel's `BoardUpdated` broadcast uses it today.
-- Watch proxy buffering: Caddy must not buffer the SSE response (`flush_interval -1` on the
-  matcher) — add it when the `/events` route flips.
-- Frontend still connects via Reverb/`pusher-js` (battleui Vue SPA); Phase 3 includes switching
-  the SPA transport to `EventSource` against `:8085` — that's the Playwright gate.
+- The SSE surface lives in `internal/gateway/sse` (broadcaster, per-user registry, frame
+  building) + `internal/gateway/events.go` (the gin handler, replay). The broadcaster is
+  constructed in `main`/`authEnv` beside the bus and **must be `Close()`d before
+  `server.Shutdown`** (streams never end on their own).
+- New realtime events for later phases (e.g. `match.found` at Phase 4): publish a typed event
+  on the bus and give the broadcaster a frame for it — the SSE event name is the client
+  contract (`EngagementHub` listens for `match.found`); user-targeted (not match-targeted)
+  frames will need a recipient rule other than `Teams`.
+- The SPA facade (`battleui/resources/js/services/sse.js`) dispatches by SSE event name to
+  every registered channel's listeners; channel *names* are lifecycle-only. Adding events
+  client-side = `.listen('.new.event', cb)` — no transport work.
+- `Deps.SSEHeartbeat` (100ms in `authEnv`) is how stream tests bound "nothing arrives":
+  `expectSilence(t, beats)` reads until N heartbeats pass.
+
+**Phase 4 (matchmaking) entry points:**
+
+- Laravel side to port: `MatchMakingController` (`/matchmaking/join|status|leave`) +
+  `MatchFound` broadcast (envelope: `message: "Match Found"`, `data: {match_id, game_mode}`).
+  Emit it on the SSE stream (bus event → broadcaster) and delete caveat (e).
+- Kickoff rule 4: match creation ("participants + teams + context → running arena") is its own
+  operation the queue calls; queue identity carries a scope parameter (future per-city-arena
+  queues).
+- **Arena resurrection (ISS-054)** is flagged as a riskiest-part item — read the issue before
+  porting.
+- The token-renewal feature suite still drives `/auth/export` as its authenticated endpoint;
+  once matchmaking exists, consider pointing it at `/matchmaking/status` per its original note.
 
 **Operational notes:**
 

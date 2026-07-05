@@ -763,6 +763,42 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Realtime Events (SSE)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "text/event-stream",
+								"type": "text"
+							},
+							{
+								"key": "Last-Event-ID",
+								"value": "match-uuid-here:0",
+								"type": "text",
+								"description": "Optional: {match_id}:{version} — replays the current snapshot if newer (participant-gated).",
+								"disabled": true
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/events",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"events"
+							]
+						},
+						"description": "Authenticated SSE stream replacing the Reverb websocket (migration Phase 3, spec [[api_websocket_game_events]]). Events: id {match_id}:{version}, event = engine event type (board.updated, turn.started, game.ended, ...), data = Standard Envelope with per-recipient fog-of-war-masked board state. Heartbeat comment ~25s."
+					},
+					"response": []
 				}
 			]
 		},
