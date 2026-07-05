@@ -76,6 +76,63 @@ still pending: they need the full dev stack up and clients pointed at the `:8085
 *content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
 text at Phase 6 per doc 05 §4.
 
+### Session handover (updated 2026-07-05, post-Phase 2 — read before starting Phase 3)
+
+**Porting conventions established in Phases 0–2** (follow these; they are load-bearing, not style):
+
+- **Parity is byte-level, PHP quirks included.** Ported handlers reproduce Laravel wording and
+  serialization exactly: `findOrFail` 404 keeps the PHP FQCN (`No query results for model
+  [App\Models\GameMatch] {id}`), policy failures answer `This action is unauthorized.`,
+  `EngineConnectionException` renders `data: []` (array, not `{}`) and a request_id that is
+  **null** when no `X-Request-ID` header exists. Where PHP 500s on garbage (non-uuid path/entity
+  ids → QueryException), Go `must(err)`-panics into the recovery 500 on purpose. Envelope key
+  order is pinned with typed structs; the one order we can't keep is *inside* dynamic maps
+  (`game_state` content) — accepted, JSON object order is not semantic.
+- **Validation is hand-rolled** (`internal/gateway/validation.go` + per-handler `validateX`
+  funcs) with Laravel's exact message wording ("The data.match id field is required."). No
+  binding/validator library on parity surfaces.
+- **Tests:** `authEnv` in `internal/gateway/authenv_test.go` is the shared feature-test harness
+  (shared migrated testcontainer, `TRUNCATE` per test = RefreshDatabase, `clock.Fake` = 
+  `Carbon::setTestNow`, `fakeEngine` = the Mockery engine mock). Extend it, don't fork it.
+  Feature tests hit real Postgres; only the engine is doubled.
+- **sqlc:** one queries.sql + generated `<domain>pg` package per domain, registered in
+  `sqlc.yaml`; binary at `~/go/bin/sqlc`. Nullable uuid columns generate `pgtype.UUID` (the
+  override only covers NOT NULL) — check generated types after `sqlc generate`.
+- **Cross-module imports** (e.g. hub → `upsilonapi/stdmessage`) rely on `go.work` resolution
+  with **no `require` in go.mod** — sibling convention; don't run `go mod tidy` blindly.
+- **ATD:** links use workspace prefixes (`[[upsilonapi:...]]`, `[[upsilonbattle:...]]`,
+  `[[shared:...]]` = umbrella `./docs`); tags go atop the exact function/type, test files carry
+  `@test-link` only (ATD.md §6). Validate mechanically (grep links → check
+  `<project>/docs/<atom>.atom.md` exists) until the MCP cross-project attribution works.
+
+**Phase 3 (SSE) entry points:**
+
+- Doc 03 is the resolved design: `GET /events`, heartbeat, `Last-Event-ID` replay,
+  per-recipient masking per connection.
+- The fan-out seam is ready: subscribe to `events.Bus` for `battle.BoardUpdated` (published by
+  `battle.PG.IngestEvent` after persist, synchronously, ordered). The event carries the
+  **unmasked** state incl. `_atd_meta`; mask per connection with `battle.MaskBoardState`
+  (deliberately non-mutating so one snapshot serves N recipients) + `battle.Service.Teams`.
+- Replay source for `Last-Event-ID`: `game_matches.version` + `game_state_cache` (only the
+  latest state is persisted — replay means "send current snapshot if newer", not an event log).
+- Open decision flagged in doc 03: whether per-login `ws_channel_key` rotation survives SSE
+  (identity already rotates it; `identity.User.WsChannelKey` is loaded). Decide early — it
+  shapes the SSE auth/channel model and Laravel's `BoardUpdated` broadcast uses it today.
+- Watch proxy buffering: Caddy must not buffer the SSE response (`flush_interval -1` on the
+  matcher) — add it when the `/events` route flips.
+- Frontend still connects via Reverb/`pusher-js` (battleui Vue SPA); Phase 3 includes switching
+  the SPA transport to `EventSource` against `:8085` — that's the Playwright gate.
+
+**Operational notes:**
+
+- Real `.env`s must adopt `UPSILON_WEBHOOK_URL=http://proxy:8085/api/webhook/upsilon`
+  (env.example updated at Phase 2); with the old value the engine calls Laravel's webhook and
+  the hub never sees events.
+- The hub binary is run by hand inside the `app` devcontainer (`upsilonhub/bin/upsilonhub`,
+  `:8090`); new config: `UPSILON_API_URL` (default `http://engine:8081`).
+- Gates 2–3 (Playwright, upsiloncli at `:8085`) have not run for Phases 1–2 — first session
+  with the full stack up should clear that backlog before building on top.
+
 ### Compose review vs the side-by-side architecture (2026-07-04, post-Phase 1)
 
 - **`docker-compose.yaml` (dev): aligned.** otel-collector + cutover `proxy` (caddy, `:8085`
