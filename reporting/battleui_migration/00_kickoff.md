@@ -61,7 +61,7 @@ Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Pha
 | 2 — Engine bridge + game proxy | **DONE 2026-07-05** | Typed engine client (`internal/transport/engineclient`, shares the engine's `stdmessage` envelope; engine rule rejections pass through with `meta.error_key`; `EngineConnectionException` 503 envelope byte-parity, `target_coords` kept raw-passthrough like PHP). `game/*` endpoints with `GameMatchPolicy`-parity authz + entity-ownership gate via `CharacterService.OwnedByPlayer`. `BoardStateResource` masking ported non-mutating (`battle.MaskBoardState`) so one snapshot masks per recipient — pinned by a unit suite. Webhook ingestion with `mech_game_state_versioning` gating (stale/duplicate), `game.ended` resolution (stats + PHP ratio string semantics), Laravel-parity validation. **In-process event bus** (`internal/events`, synchronous — the MQ seam) publishes `battle.BoardUpdated`; SSE fan-out subscribes here at Phase 3. **`EconomyService` seam introduced early** (kickoff rule 3): credit awards are ledger+wallet in one tx, `int64`. `BattleProxyTest` re-expressed (4 tests + a versioning-gate test) and green; full suite green. Proxy routes `/api/v1/game/*` + `/api/webhook/upsilon` → hub; `UPSILON_WEBHOOK_URL` repointed at the proxy front door (`env.example` — real `.env`s must follow). |
 | 3 — Realtime (SSE) | **DONE 2026-07-05** | `GET /api/v1/events` (RequireAuth only — sliding renewal rides REST envelopes, never the stream): the bearer-authenticated stream *is* the user's private channel. **`ws_channel_key` decision (doc 03): retired from the transport**; login keeps rotating it for Laravel interop until Phase 6, column removal then. `internal/gateway/sse` broadcaster subscribes to the bus, masks per recipient (`battle.MaskBoardState`, participants only, exactly the PHP broadcast loop), frame = `id: {match}:{version}`, `event:` = engine event type passthrough, `data:` = the `BoardUpdated::broadcastWith` envelope (`message: "Board Updated"`, uuid7 request_id, `data.match_id` + masked state, empty meta). Heartbeat comment ~25s (`Deps.SSEHeartbeat` shortens it in tests); slow consumers dropped at a 32-frame buffer (reconnect + replay self-heals); broadcaster closed before `server.Shutdown` so streams drain. `Last-Event-ID` replay = current-snapshot-if-newer, participant-gated, named after `_atd_meta.last_event_type`. SPA: `laravel-echo`/`pusher-js`/`@laravel/echo-vue` **removed**; `services/sse.js` is a fetch-based SSE client behind an Echo-compatible facade — fetch, not native `EventSource`, because sliding renewal retires the old token ~20s after renewal, so a URL-frozen token dies mid-session; every reconnect re-reads localStorage and sends `Last-Event-ID`. Composables/components untouched (facade keeps `.private().listen/.subscribed/.error`, `.leave`, and the pusher-shaped `connector.pusher.connection` health object). Caddy routes `/api/v1/events` → hub with `flush_interval -1` (config validated). communication.md §2.8 rewritten + endpoint table + Postman entry added. 6 SSE feature tests over a real httptest server (masked fan-out to 2 recipients, envelope shape, non-participant silence, replay, replay authz, malformed-id degrade, 401) + full suite green; SPA `npm run build` green. |
 | 4 — Matchmaking | **DONE 2026-07-05** | All `MatchMakingController` endpoints (`matchmaking/join\|status\|leave`, `match/stats/waiting\|active`) behind a `battle.Matchmaker` domain object; **match creation is its own operation** (`CreateMatch`: participants + teams + context → running arena) that queue processing calls, queue identity carries `QueueScope` (kickoff rule 4). PHP-parity AI generation (name patterns, archetypes ≤1 support/≤1 sneak, `total_wins` grading) and team split — including the PHP quirk that 2v2_PVE seats human #2 on team 2 beside both AIs (ported as-is). Engine start payload = `UpsilonPlayerResource` parity: new `CharacterService.BattleLoadouts` resolves equipment (armor→utility→weapon UNION over the 3 slot columns) + inventory skills + D11 item-derived skills. Engine client gains StartArena/ArenaExists/ResurrectArena/ActiveMatchStats. **ISS-054 resurrection is live, with two deliberate PHP divergences:** (1) `serializer_version` is forwarded from the cached blob — PHP never sent it, so the engine's schema guard (bridge_resurrect.go) refused *every* Laravel resurrection; (2) an engine envelope with `success=false` counts as a failed resurrection → match concluded (PHP fell through to "matched" pointing the player at an arena never rebuilt). `match.found` now rides the SSE stream (bus event `battle.MatchFound` with explicit recipients — user-targeted, no masking, **no `id:` line**, nothing to replay; SPA facade needed zero changes) — old caveat (e) resolved. Hub reads `UPSILON_WEBHOOK_URL` (default = proxy front door) as the callback for arenas it starts. Proxy routes `/api/v1/matchmaking/*` + `/api/v1/match/stats/*` → hub (Caddyfile validated; restart the `proxy` container). 14 PHP tests (Matchmaking/ExtraMatchmaking/PVEMatchmaking/MatchVerification) re-expressed + extras (409 conflicts, loadout payload, SSE `match.found`, 4-test resurrection suite); token-renewal suite now drives `/matchmaking/status` per its original note; full suite green. communication.md §2.3 + §2.8 updated. |
-| 5 — Economy/loadout + admin | next | Shop, inventory, equipment, skills, leaderboard, admin CRUD — **port thin** (behavior parity over `EconomyService`/inventory seams; v3.0 reshapes shop→market, items→registry). Every credit/wallet/market mutation through `EconomyService` (seam already live since Phase 2). |
+| 5 — Economy/loadout + admin | **DONE 2026-07-06** | All remaining player + admin endpoints ported thin. **Profile/characters:** `profile\|credits\|characters\|character/{id}` + reroll/upgrade/rename/delete over `CharacterService` (+`IdentityService.IncrementRerollCount` — users-table writes stay behind the seam); CP-cap/negative-check wording byte-parity; policy denials verbatim (`You do not own this character.`, `Reroll limit reached.`). **Shop/inventory:** `EconomyService` grew the market/inventory surface (catalog, `Purchase` = wallet-lock → guards → debit → upsert → both audit ledgers in one tx, `int64`; `PurchaseError` carries the PHP message/status/reason). **Equipment:** 3-slot ops live in `CharacterService` (gameplay tables); the inventory ownership check is an explicit `EconomyService.GetInventoryItem` call — the designed Phase 8 hub→economy seam (doc 02 §5 wrinkle). Cross-character mutual exclusivity in one tx. **Skills:** templates browse + per-character inventory (roll/equip/unequip, slot cap under row locks); `battle.Content` is the skill-template registry (admin CRUD); engine roll via `Engine.GenerateSkill` — the one **raw-body** engine call (no envelope), 5 s timeout, non-2xx = `ErrGeneratorUnavailable` (PHP bridge parity: unavailable/unreachable/invalid-response 503s). **Leaderboard:** hand-built envelope preserved (no top-level `meta` — renewal never patches it, like PHP), Sunday-00:01-UTC cycle, wins→score→id-desc ranking, PHP division semantics (int when even). **Admin:** users/anonymize/destroy (self-protection ISS-093, last-admin guard incl. the trashed-target case), history/purge (ISS-051/053 cursor pages), shop-items + skill-templates CRUD as facet-shaped endpoints behind `middleware.RequireAdmin` (no Inertia — locked). Admin anonymize deliberately does **not** revoke tokens (PHP parity; soft-deleted owner locks them out anyway). PHP tests re-expressed: CharacterTest, CharacterUpgradeTest, SkillTest (all 15), LeaderboardTest, AdminSelfProtectionTest + shop/inventory/equipment/CRUD extras (~50 new tests); full suite green. Proxy routes `/api/v1/{profile,profile/*,shop/*,skills/*,leaderboard,admin/*}` → hub (Caddyfile validated). Dangling PHP spec-links re-anchored per doc 05: `api_skill_generate_engine`→`[[upsilonapi:api_skill_generation]]`, `mech_character_reroll_{limit,effect}`→`[[upsilonbattle:mech_character_reroll]]`, `rule_admin_content_authority` dropped (no such atom). `/api/v1/help` stays on Laravel (CodeDiscoveryService introspects PHP source — Phase 6 decides its fate). |
 
 Open caveats: (a) ATD MCP server was restarted (workspace cache now post-restructure), but
 `atd_check`/`atd_test_links` scoped to `upsilonhub` still do not attribute *prefixed*
@@ -74,23 +74,26 @@ own corpus is frontend-only). Two PHP spec-links were dangling and are re-anchor
 `entity_character_allocate_hp` → dropped (no such atom anywhere). (b) Playwright/upsiloncli gates
 still pending: they need the full dev stack up and clients pointed at the `:8085` proxy front door
 (only the DB container was running when Phase 1 landed); the backlog now includes the Phase 3 SSE
-E2E check (arena receives `board.updated` through the proxy) and the Phase 4 checks (queue → match
+E2E check (arena receives `board.updated` through the proxy), the Phase 4 checks (queue → match
 → `match.found` on the stream through the proxy; a real ISS-054 kill-the-engine-mid-match
-resurrection); restart the `proxy` container to pick up the Caddyfile changes. (c) Local umbrella dir is still
+resurrection) and the Phase 5 checks (shop → equip → arena loadout through the proxy; a real
+engine `skills/generate` roll — the fake only pins the contract); restart the `proxy` container
+to pick up the Caddyfile changes (Phase 5 added routes). (c) Local umbrella dir is still
 `upsilon-hub` though the GitHub repo is `upsilonumbrella`. (d) `mech_sanctum_token_renewal` atom
 *content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
 text at Phase 6 per doc 05 §4; same now for the `api_websocket*` atoms, which still describe the
 Pusher/Reverb protocol while Phase 3 code links to them for their transport-agnostic semantics
 (channels → stream, events, masking) — content rewrite at Phase 6 per doc 05 §4. (e) **Resolved at Phase 4** — the hub emits
 `match.found` on the SSE stream; the dashboard polling stays as belt-and-braces but match entry is
-push again. (f) `code_health_check.py` reports 70 errors on upsilonhub — the 56 pre-existing plus
-14 new ones that are all "missing doc comment" on **sqlc-generated** functions in the `*pg`
-packages (the same accepted category; hand-annotating generated code would be wiped by the next
-`sqlc generate`). The hand-written Phase 4 diff adds zero errors — new files were split to respect
-the ≤10-links / ≤400-LOC budgets (`battle/enginepayload.go`, `battle/matchmaking_status.go`, the
-three matchmaking test files).
+push again. (f) `code_health_check.py` reports 110 errors on upsilonhub after Phase 5 — 10 hand-written
+"too few ATD links" files pre-dating Phase 5 (main.go, config, database, clock, bus, jobs,
+password, testutil, embed, authenv_test) plus ~100 that are all missing-doc/no-links on
+**sqlc-generated** functions in the `*pg` packages (the same accepted category; hand-annotating
+generated code would be wiped by the next `sqlc generate` — Phase 5 added many queries, so the
+count grew). The hand-written Phase 5 diff adds zero errors — mounts moved into their handler
+files and `engineclient/client_skills.go` split off to respect the ≤10-links budget.
 
-### Session handover (updated 2026-07-05, post-Phase 4 — read before starting Phase 5)
+### Session handover (updated 2026-07-06, post-Phase 5 — read before starting Phase 6)
 
 **Porting conventions established in Phases 0–2** (follow these; they are load-bearing, not style):
 
@@ -157,19 +160,42 @@ three matchmaking test files).
 - ISS-054 divergences from PHP are deliberate and pinned by tests (serializer_version
   forwarded; engine refusal = failure → conclude). Don't "fix" them back to PHP behavior.
 
-**Phase 5 (economy/loadout + admin) entry points:**
+**Phase 5 (economy/loadout + admin) conventions now load-bearing:**
 
-- Laravel side to port: `ShopController`, `EquipmentService`, `SkillService`,
-  `ProfileController` (profile/credits/characters + reroll/upgrade/rename/delete),
-  `LeaderboardController`, and the admin CRUD pages (locked decision: facet-shaped API
-  endpoints, future `/admin/v1` — no Inertia).
-- **Port thin** (kickoff rule 6): behavior parity over the seams, no polish — v3.0 reshapes
-  shop→market vendor, items→shared registry.
-- Every credit/wallet/market mutation through `EconomyService` (live since Phase 2, ledger+
-  wallet in one tx, `int64`); equipment↔inventory coupling becomes the first cross-service
-  calls (doc 02 Phase 5 note).
-- PHP suites to re-express: `SkillTest`, `CharacterTest`/`CharacterUpgradeTest`,
-  `LeaderboardTest`, `AdminSelfProtectionTest` (+ shop/inventory coverage inside them).
+- **Seam growth, not new seams:** profile character ops + equipment + character skills all
+  live in `CharacterService` (`pg_profile.go`/`pg_equipment.go`/`pg_skills.go` on the same
+  PG); shop/inventory/purchase in `EconomyService` (`pg_shop.go`/`pg_inventory.go`);
+  skill templates in `battle.Content` (implemented by the same `battle.PG`, wired as
+  `Deps.Content`). Users-table writes (reroll counter, admin destructive actions) stay in
+  `IdentityService` (`pg_admin.go`).
+- **The equip ownership check is the Phase 8 seam:** gateway → `EconomyService.GetInventoryItem`
+  (owner + catalog slot) → `CharacterService.Equip`. Never join `player_inventory` from
+  character queries for authz — that call is the future network hop.
+- `Engine.GenerateSkill` is the one raw-body engine call (no stdmessage envelope) — it lives in
+  `engineclient/client_skills.go`; non-2xx → `battle.ErrGeneratorUnavailable`, transport →
+  `ErrEngineUnreachable`; the gateway maps the three PHP 503 messages off those.
+- **Mount functions live beside their handlers** (mountProfile in profile.go etc.), not in
+  router.go — that is how the ≤10-links budget holds; follow it for new endpoint groups.
+- Laravel time formats in responses: Eloquent datetime casts → `microTime` ("…​.000000Z",
+  resources_items.go); `toIso8601String` → `isoTime` ("+00:00", game.go); `toDateString` →
+  `formatDate`. Cursor pagination emits `microTime` (Carbon `toISOString`).
+- The leaderboard writes its envelope by hand (no top-level `meta`, header-only request id) —
+  don't "fix" it onto `respond`; PHP renewal never patched meta-less responses either.
+- ATD reality check: most Phase 5 API/rule atoms live in **upsilonapi/docs** (not
+  upsilonbattle); entities partly in **upsilontypes**; `rule_progression`/`rule_stat_taxonomy`
+  in umbrella `./docs`. Validate with the mechanical grep before assuming a prefix.
+
+**Phase 6 (cutover & decommission) entry points:**
+
+- Flip the proxy fully; collapse `app`/`ws`/`db-init` into one `hub` container (needs the
+  still-missing upsilonhub Dockerfile + a river-only migrate mode — see the compose review
+  below); archive Laravel; SPA moves out of battleui and is served statically.
+- `/api/v1/help` is the last unported endpoint (CodeDiscoveryService introspects PHP source —
+  decide: re-express over the Go route table, or retire).
+- Fix inbound `[[battleui:*]]` links once (doc 05); rewrite `mech_sanctum_token_renewal` +
+  `api_websocket*` atom content (caveat d); drop the `ws_channel_key` column (Phase 3 note).
+- Clear the E2E backlog (caveat b) **before** deleting PHP — the Laravel fallback is the
+  rollback path.
 
 **Operational notes:**
 

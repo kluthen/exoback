@@ -187,6 +187,10 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.2 Profile & Character Management
 
+> Served by the Go hub since migration Phase 5 (the proxy routes
+> `/api/v1/profile` and `/api/v1/profile/*` to `:8090`). Contracts below
+> are unchanged.
+
 #### `GET /profile`
 - **Specification:** [[customer_player_profile]]
 - **Intent:** Retrieve global player statistics, win/loss ratio, and basic roster overview.
@@ -309,6 +313,11 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.5 Shop, Inventory & Equipment (ISS-074)
 
+> Served by the Go hub since migration Phase 5 (`/api/v1/shop/*`,
+> `/api/v1/profile/inventory` and the equipment routes go to `:8090`).
+> Every credit/wallet/market mutation runs through the hub's economy
+> seam (ledger + wallet in one transaction).
+
 #### `GET /shop/items`
 - **Specification:** [[upsilonapi:api_shop_browse]]
 - **Intent:** List the V2.0 catalog of purchasable items.
@@ -347,6 +356,10 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.6 Social & Competitive
 
+> Served by the Go hub since migration Phase 5 (`/api/v1/leaderboard`
+> goes to `:8090`). The hand-built envelope (no top-level `meta`) is
+> preserved.
+
 #### `GET /leaderboard`
 - **Specification:** [[api_leaderboard]]
 - **Intent:** Retrieve global rankings for a specific battle mode, filtered by the current weekly cycle.
@@ -362,6 +375,11 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
   - `meta`: `PaginationMeta`
 
 ### 2.7 Administrative Management
+
+> Served by the Go hub since migration Phase 5 (`/api/v1/admin/*` goes to
+> `:8090`) as facet-shaped API endpoints (locked no-Inertia decision —
+> future `/admin/v1`). The Inertia admin *pages* stay on Laravel until
+> Phase 6; their data already comes from these endpoints.
 
 #### `GET /admin/dashboard`
 - **Specification:** [[ui_admin_dashboard]]
@@ -427,6 +445,9 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
   - Standard Success Envelope
 
 ### 2.10 Admin Catalog Management (ISS-086)
+
+> Served by the Go hub since migration Phase 5 (routes under
+> `/api/v1/admin/*`).
 
 #### `GET /admin/shop-items`
 - **Specification:** [[api_shop_item_admin_crud]]
