@@ -60,7 +60,8 @@ Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Pha
 | 1 — Auth + identity | **DONE 2026-07-04** | All `auth/*` endpoints (login, admin login, register+roster, logout, update, password, export, delete) behind `IdentityService`/`CharacterService` seams; Sanctum-wire-compatible opaque tokens (`{id}\|{40 chars+crc32b}`, sha256 stored, `tokenable_type` kept as the Laravel FQCN so tokens interop across both stacks); sliding renewal (10–15 min → `meta.token`, 20 s grace) via injected clock; Laravel-parity validation (422 `meta.errors`), bcrypt (Go `$2a$` ⇄ PHP `$2y$` verified both ways); sqlc introduced (`sqlc.yaml`, queries per domain package); `AuthTest`+`GdprTest`+`SanctumTokenRenewalTest` re-expressed in Go and green (11 tests, shared testcontainer + fake-clock time-warping; renewal suite drives `/auth/export` until matchmaking exists); cutover proxy added (`caddy` on `:8085`, `/api/v1/auth/*` → hub `:8090`, rest → Laravel). |
 | 2 — Engine bridge + game proxy | **DONE 2026-07-05** | Typed engine client (`internal/transport/engineclient`, shares the engine's `stdmessage` envelope; engine rule rejections pass through with `meta.error_key`; `EngineConnectionException` 503 envelope byte-parity, `target_coords` kept raw-passthrough like PHP). `game/*` endpoints with `GameMatchPolicy`-parity authz + entity-ownership gate via `CharacterService.OwnedByPlayer`. `BoardStateResource` masking ported non-mutating (`battle.MaskBoardState`) so one snapshot masks per recipient — pinned by a unit suite. Webhook ingestion with `mech_game_state_versioning` gating (stale/duplicate), `game.ended` resolution (stats + PHP ratio string semantics), Laravel-parity validation. **In-process event bus** (`internal/events`, synchronous — the MQ seam) publishes `battle.BoardUpdated`; SSE fan-out subscribes here at Phase 3. **`EconomyService` seam introduced early** (kickoff rule 3): credit awards are ledger+wallet in one tx, `int64`. `BattleProxyTest` re-expressed (4 tests + a versioning-gate test) and green; full suite green. Proxy routes `/api/v1/game/*` + `/api/webhook/upsilon` → hub; `UPSILON_WEBHOOK_URL` repointed at the proxy front door (`env.example` — real `.env`s must follow). |
 | 3 — Realtime (SSE) | **DONE 2026-07-05** | `GET /api/v1/events` (RequireAuth only — sliding renewal rides REST envelopes, never the stream): the bearer-authenticated stream *is* the user's private channel. **`ws_channel_key` decision (doc 03): retired from the transport**; login keeps rotating it for Laravel interop until Phase 6, column removal then. `internal/gateway/sse` broadcaster subscribes to the bus, masks per recipient (`battle.MaskBoardState`, participants only, exactly the PHP broadcast loop), frame = `id: {match}:{version}`, `event:` = engine event type passthrough, `data:` = the `BoardUpdated::broadcastWith` envelope (`message: "Board Updated"`, uuid7 request_id, `data.match_id` + masked state, empty meta). Heartbeat comment ~25s (`Deps.SSEHeartbeat` shortens it in tests); slow consumers dropped at a 32-frame buffer (reconnect + replay self-heals); broadcaster closed before `server.Shutdown` so streams drain. `Last-Event-ID` replay = current-snapshot-if-newer, participant-gated, named after `_atd_meta.last_event_type`. SPA: `laravel-echo`/`pusher-js`/`@laravel/echo-vue` **removed**; `services/sse.js` is a fetch-based SSE client behind an Echo-compatible facade — fetch, not native `EventSource`, because sliding renewal retires the old token ~20s after renewal, so a URL-frozen token dies mid-session; every reconnect re-reads localStorage and sends `Last-Event-ID`. Composables/components untouched (facade keeps `.private().listen/.subscribed/.error`, `.leave`, and the pusher-shaped `connector.pusher.connection` health object). Caddy routes `/api/v1/events` → hub with `flush_interval -1` (config validated). communication.md §2.8 rewritten + endpoint table + Postman entry added. 6 SSE feature tests over a real httptest server (masked fan-out to 2 recipients, envelope shape, non-participant silence, replay, replay authz, malformed-id degrade, 401) + full suite green; SPA `npm run build` green. |
-| 4 — Matchmaking | next | Queue join/status/leave + match creation as its own operation (kickoff rule 4, scope parameter); hub emits `match.found` on the SSE stream; **arena resurrection (ISS-054)**. Until then the dashboard's 5s status polling covers match redirects (see caveat e). |
+| 4 — Matchmaking | **DONE 2026-07-05** | All `MatchMakingController` endpoints (`matchmaking/join\|status\|leave`, `match/stats/waiting\|active`) behind a `battle.Matchmaker` domain object; **match creation is its own operation** (`CreateMatch`: participants + teams + context → running arena) that queue processing calls, queue identity carries `QueueScope` (kickoff rule 4). PHP-parity AI generation (name patterns, archetypes ≤1 support/≤1 sneak, `total_wins` grading) and team split — including the PHP quirk that 2v2_PVE seats human #2 on team 2 beside both AIs (ported as-is). Engine start payload = `UpsilonPlayerResource` parity: new `CharacterService.BattleLoadouts` resolves equipment (armor→utility→weapon UNION over the 3 slot columns) + inventory skills + D11 item-derived skills. Engine client gains StartArena/ArenaExists/ResurrectArena/ActiveMatchStats. **ISS-054 resurrection is live, with two deliberate PHP divergences:** (1) `serializer_version` is forwarded from the cached blob — PHP never sent it, so the engine's schema guard (bridge_resurrect.go) refused *every* Laravel resurrection; (2) an engine envelope with `success=false` counts as a failed resurrection → match concluded (PHP fell through to "matched" pointing the player at an arena never rebuilt). `match.found` now rides the SSE stream (bus event `battle.MatchFound` with explicit recipients — user-targeted, no masking, **no `id:` line**, nothing to replay; SPA facade needed zero changes) — old caveat (e) resolved. Hub reads `UPSILON_WEBHOOK_URL` (default = proxy front door) as the callback for arenas it starts. Proxy routes `/api/v1/matchmaking/*` + `/api/v1/match/stats/*` → hub (Caddyfile validated; restart the `proxy` container). 14 PHP tests (Matchmaking/ExtraMatchmaking/PVEMatchmaking/MatchVerification) re-expressed + extras (409 conflicts, loadout payload, SSE `match.found`, 4-test resurrection suite); token-renewal suite now drives `/matchmaking/status` per its original note; full suite green. communication.md §2.3 + §2.8 updated. |
+| 5 — Economy/loadout + admin | next | Shop, inventory, equipment, skills, leaderboard, admin CRUD — **port thin** (behavior parity over `EconomyService`/inventory seams; v3.0 reshapes shop→market, items→registry). Every credit/wallet/market mutation through `EconomyService` (seam already live since Phase 2). |
 
 Open caveats: (a) ATD MCP server was restarted (workspace cache now post-restructure), but
 `atd_check`/`atd_test_links` scoped to `upsilonhub` still do not attribute *prefixed*
@@ -73,20 +74,23 @@ own corpus is frontend-only). Two PHP spec-links were dangling and are re-anchor
 `entity_character_allocate_hp` → dropped (no such atom anywhere). (b) Playwright/upsiloncli gates
 still pending: they need the full dev stack up and clients pointed at the `:8085` proxy front door
 (only the DB container was running when Phase 1 landed); the backlog now includes the Phase 3 SSE
-E2E check (arena receives `board.updated` through the proxy; restart the `proxy` container to pick
-up the Caddyfile change). (c) Local umbrella dir is still
+E2E check (arena receives `board.updated` through the proxy) and the Phase 4 checks (queue → match
+→ `match.found` on the stream through the proxy; a real ISS-054 kill-the-engine-mid-match
+resurrection); restart the `proxy` container to pick up the Caddyfile changes. (c) Local umbrella dir is still
 `upsilon-hub` though the GitHub repo is `upsilonumbrella`. (d) `mech_sanctum_token_renewal` atom
 *content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
 text at Phase 6 per doc 05 §4; same now for the `api_websocket*` atoms, which still describe the
 Pusher/Reverb protocol while Phase 3 code links to them for their transport-agnostic semantics
-(channels → stream, events, masking) — content rewrite at Phase 6 per doc 05 §4. (e) Until Phase 4,
-`match.found` reaches nobody the SPA listens to (Laravel still broadcasts it to Reverb, but the SPA
-left Reverb): match entry relies on the dashboard's 5-second `/matchmaking/status` polling, a ≤5s
-latency regression accepted for the side-by-side window. (f) `code_health_check.py` reports 56
-errors on upsilonhub — all pre-existing on HEAD (sqlc-generated `*pg` packages and a few Phase 0–2
-files lack ATD links/doc comments); the Phase 3 diff adds zero.
+(channels → stream, events, masking) — content rewrite at Phase 6 per doc 05 §4. (e) **Resolved at Phase 4** — the hub emits
+`match.found` on the SSE stream; the dashboard polling stays as belt-and-braces but match entry is
+push again. (f) `code_health_check.py` reports 70 errors on upsilonhub — the 56 pre-existing plus
+14 new ones that are all "missing doc comment" on **sqlc-generated** functions in the `*pg`
+packages (the same accepted category; hand-annotating generated code would be wiped by the next
+`sqlc generate`). The hand-written Phase 4 diff adds zero errors — new files were split to respect
+the ≤10-links / ≤400-LOC budgets (`battle/enginepayload.go`, `battle/matchmaking_status.go`, the
+three matchmaking test files).
 
-### Session handover (updated 2026-07-05, post-Phase 3 — read before starting Phase 4)
+### Session handover (updated 2026-07-05, post-Phase 4 — read before starting Phase 5)
 
 **Porting conventions established in Phases 0–2** (follow these; they are load-bearing, not style):
 
@@ -131,18 +135,41 @@ files lack ATD links/doc comments); the Phase 3 diff adds zero.
 - `Deps.SSEHeartbeat` (100ms in `authEnv`) is how stream tests bound "nothing arrives":
   `expectSilence(t, beats)` reads until N heartbeats pass.
 
-**Phase 4 (matchmaking) entry points:**
+**Phase 4 (matchmaking) conventions now load-bearing:**
 
-- Laravel side to port: `MatchMakingController` (`/matchmaking/join|status|leave`) +
-  `MatchFound` broadcast (envelope: `message: "Match Found"`, `data: {match_id, game_mode}`).
-  Emit it on the SSE stream (bus event → broadcaster) and delete caveat (e).
-- Kickoff rule 4: match creation ("participants + teams + context → running arena") is its own
-  operation the queue calls; queue identity carries a scope parameter (future per-city-arena
-  queues).
-- **Arena resurrection (ISS-054)** is flagged as a riskiest-part item — read the issue before
-  porting.
-- The token-renewal feature suite still drives `/auth/export` as its authenticated endpoint;
-  once matchmaking exists, consider pointing it at `/matchmaking/status` per its original note.
+- `battle.Matchmaker` (`internal/games/battle/matchmaking.go` + `matchmaking_status.go`) is the
+  domain object for queue processing; gateway handlers validate/translate only and map its
+  sentinel errors (`ErrAlreadyQueued`/`ErrInActiveMatch` → the PHP 409 wordings). `CreateMatch`
+  is the rule-4 operation — extend `QueueScope`, not the operation, for new queue identities.
+- Engine payload contracts live in `battle/enginepayload.go` (plain structs mirroring
+  upsilonapi's `api.Player` family; property blocks stay `json.RawMessage` — the hub forwards,
+  the engine interprets). `CharacterService.BattleLoadouts` is the only reader of the
+  equipment/skill tables; Phase 5's inventory work should grow that seam, not bypass it.
+- `fakeEngine` now carries **per-method** canned results (`startResult`, `existsResult`,
+  `resurrectResult`, `statsResult` + call recorders); set only what the test needs.
+- User-targeted SSE frames (vs match-targeted): publish a bus event with explicit `Recipients`
+  and give the broadcaster a frame builder — `MatchFoundFrame` is the template. Transient
+  frames set no `Frame.ID` (the `id:` line is omitted; the client's replay cursor keeps
+  pointing at board state).
+- Health-check budgets are real gates: ≤10 ATD links and ≤400 effective LOC per file — split
+  files along domain seams before trimming links. sqlc-generated `*pg` files are accepted debt
+  (caveat f).
+- ISS-054 divergences from PHP are deliberate and pinned by tests (serializer_version
+  forwarded; engine refusal = failure → conclude). Don't "fix" them back to PHP behavior.
+
+**Phase 5 (economy/loadout + admin) entry points:**
+
+- Laravel side to port: `ShopController`, `EquipmentService`, `SkillService`,
+  `ProfileController` (profile/credits/characters + reroll/upgrade/rename/delete),
+  `LeaderboardController`, and the admin CRUD pages (locked decision: facet-shaped API
+  endpoints, future `/admin/v1` — no Inertia).
+- **Port thin** (kickoff rule 6): behavior parity over the seams, no polish — v3.0 reshapes
+  shop→market vendor, items→shared registry.
+- Every credit/wallet/market mutation through `EconomyService` (live since Phase 2, ledger+
+  wallet in one tx, `int64`); equipment↔inventory coupling becomes the first cross-service
+  calls (doc 02 Phase 5 note).
+- PHP suites to re-express: `SkillTest`, `CharacterTest`/`CharacterUpgradeTest`,
+  `LeaderboardTest`, `AdminSelfProtectionTest` (+ shop/inventory coverage inside them).
 
 **Operational notes:**
 
@@ -150,7 +177,9 @@ files lack ATD links/doc comments); the Phase 3 diff adds zero.
   (env.example updated at Phase 2); with the old value the engine calls Laravel's webhook and
   the hub never sees events.
 - The hub binary is run by hand inside the `app` devcontainer (`upsilonhub/bin/upsilonhub`,
-  `:8090`); new config: `UPSILON_API_URL` (default `http://engine:8081`).
+  `:8090`); config: `UPSILON_API_URL` (default `http://engine:8081`) and, since Phase 4,
+  `UPSILON_WEBHOOK_URL` (default `http://proxy:8085/api/webhook/upsilon`) — the callback the
+  hub hands the engine for arenas it starts/resurrects.
 - Gates 2–3 (Playwright, upsiloncli at `:8085`) have not run for Phases 1–2 — first session
   with the full stack up should clear that backlog before building on top.
 

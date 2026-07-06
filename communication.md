@@ -245,6 +245,11 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.3 Matchmaking & Queue
 
+> Served by the Go hub since migration Phase 4 (the proxy routes
+> `/api/v1/matchmaking/*` and `/api/v1/match/stats/*` to `:8090`). Contracts
+> below are unchanged; `match.found` now reaches the SPA over the SSE stream
+> (§2.8).
+
 #### `POST /matchmaking/join`
 - **Specification:** [[api_matchmaking]]
 - **Intent:** [[uc_matchmaking]]: Enter the queue for a specific game mode.
@@ -259,6 +264,10 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 #### `GET /matchmaking/status`
 - **Specification:** [[api_matchmaking]]
 - **Intent:** [[uc_matchmaking]]: Poll for matchmaking updates or match assignment.
+- **Logic:** For an active match, verifies the arena still exists in the engine
+  ([[api_arena_existence_check]]) and attempts resurrection from the cached board
+  state when it does not (ISS-054); a failed or impossible resurrection concludes
+  the match server-side (`status: "idle"`, message explains the loss).
 - **Output:** 
   - `status`: `string` ("queued" | "matched" | "idle")
   - `match_id`: `string (UUID)|null`
@@ -478,8 +487,10 @@ side-by-side (legacy emitters, rollback) until the Phase 6 cutover.
 - **Heartbeat:** comment frame every ~25s (proxy keep-alive/buffering guard).
 
 #### Key Events
-- `match.found`: Matchmaking success (Laravel-emitted until Phase 4 ports matchmaking to the
-  hub; until then the dashboard's 5s status polling covers it).
+- `match.found`: Matchmaking success (hub-emitted since Phase 4; envelope
+  `message: "Match Found"`, `data: {match_id, game_mode}`, delivered to the matched
+  humans only). The frame carries no `id:` line — nothing to replay; a reconnecting
+  client learns about its match from `/matchmaking/status`.
 - `game.started`: Arena initialization complete.
 - `turn.started`: New entity initiative active (starts 30s clock).
 - `board.updated`: Position change, stat change, or successful tactical action (Move, Attack, Pass).
