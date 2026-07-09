@@ -140,43 +140,15 @@ cache. (The per-login `ws_channel_key` rotation may retire with the SSE decision
 - **Phase 6 — Cutover & decommission.** Flip the proxy fully; delete `app`/`ws`/`db-init`
   containers; replace with one `hub` container (the modular monolith). Archive Laravel.
 
-### Extraction phases (turn the seams into services)
+### Extraction phases (turn the seams into services) — moved out
 
-> Driven by **clean ownership and independent deploy/scale**, not load — Identity and Economy are
-> both *low-load* (co-location is fine), but they are cross-cutting substrates that several future
-> services will depend on, so they get their own DB ownership and service boundary now while the
-> code is fresh. Extract along the interfaces built in Phases 1 and 5 — this is implementation
-> swap (in-process call → network call), not a rewrite. Sequence them after the gateway is proven;
-> do **not** big-bang them up front.
-
-- **Phase 7 — Extract Identity service.** Promote `IdentityService` to a standalone Go service
-  owning its own schema: `users` (account_name, email, password_hash, address/birth_date, role,
-  `ws_channel_key`, soft-deletes) + `personal_access_tokens`. Exposes: token issue/validate
-  (the auth seam every other service trusts), account CRUD, GDPR export/anonymise, admin user
-  management. The hub becomes a *consumer* — token validation and `ws_channel_key` lookups (which
-  gate WS auth, doc 03 §4) go through it. **Re-run the auth/GDPR/renewal suite against the service
-  boundary**, not just in-process.
-- **Phase 8 — Extract Economy service.** Promote `EconomyService` to a standalone Go service owning
-  the wallet + market: `credit_transactions`, `inventory_transactions`, `shop_items`,
-  `player_inventories`, and the **`credits` balance moved off the `users` row into a wallet** owned
-  here. Exposes: balance read, transactional award/spend (atomic ledger), market browse/purchase,
-  inventory list. Consumers: `GameController` credit awards, shop purchase, equipment ownership
-  checks. **Play stats stay gateway-side** — `total_wins`/`losses`/`ratio` and the leaderboard are
-  battle concerns, not economy; only money/items move.
-- **Phase 9 (candidate, unscheduled) — Extract Characters/Profile service.** See doc 06 §2.3;
-  the `CharacterService` seam from Phase 1 is the preparation, extraction is a v3.0-era decision.
-
-### Data-ownership boundary (post-extraction)
-
-| Owner | Tables | Notes |
-|---|---|---|
-| **Identity svc** | `users` (account/auth cols), `personal_access_tokens` | System of record for *who*; issues/validates tokens |
-| **Economy svc** | `credit_transactions`, `inventory_transactions`, `shop_items`, `player_inventories`, wallet balance | System of record for *money & items* |
-| **Hub (gateway)** | `characters`, `game_matches`, `match_participants`, `matchmaking_queues`, `character_equipments`, `skill_templates`, `character_skills`, play-stats columns | Gameplay truth; references Identity (player) + Economy (items) by id across the seam. Hub ownership of `characters` is **provisional** — v3.0 extraction candidate (doc 06 §2.3); reference characters by UUID and avoid new joins into `characters` |
-
-> The one cross-cutting wrinkle: `character_equipments` (gameplay, hub) references inventory items
-> (economy). Equip/unequip becomes a hub→economy ownership check rather than a SQL join — design
-> that call explicitly in Phase 5's `EconomyService` interface so Phase 8 doesn't surprise you.
+> **Phases 7 (Extract Identity), 8 (Extract Economy), and the Phase 9 candidate
+> (Characters/Profile), plus the post-extraction data-ownership boundary, have
+> been relocated for safe keeping to
+> `reporting/service_extraction/00_identity_economy_extraction.md`.** They were
+> never part of the port (Phases 0–6, all done) — they are post-migration
+> service decomposition along the `IdentityService`/`EconomyService` seams, and
+> Phase 7 is already absorbed into the v3.0 roadmap as "V3-1a Auth extraction".
 
 ## 6. Effort & risk
 
@@ -189,8 +161,9 @@ cache. (The per-login `ws_channel_key` rotation may retire with the SSE decision
 | 4 Matchmaking | **L** | AI generation parity; **arena resurrection (ISS-054)** correctness |
 | 5 Economy/admin | M | Breadth (many endpoints), credit-ledger tx integrity |
 | 6 Cutover | S | Ops/runbook, data continuity (same DB → low) |
-| 7 Extract Identity | M | Token-validation seam latency; the WS auth path now depends on a remote call — cache/validate carefully |
-| 8 Extract Economy | M | Moving `credits` off `users` (data migration); award/spend must stay atomic across the service boundary (idempotency on credit events) |
+
+> Effort/risk for the extraction phases (7 Identity, 8 Economy) moved with them to
+> `reporting/service_extraction/00_identity_economy_extraction.md`.
 
 **Lowest risk:** DB schema (port verbatim), engine bridge (gets *better* with shared types).
 **Highest risk:** WebSocket transport choice and matchmaking/resurrection logic.
