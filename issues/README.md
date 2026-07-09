@@ -10,6 +10,7 @@
 
 | Ref | File | Severity | Status | Summary |
 |---|---|---|---|---|
+| ISS-107 | [ISS-107_20260709_edge_case_scenario_suite_audit.md](ISS-107_20260709_edge_case_scenario_suite_audit.md) | Medium | Open | Audit the upsiloncli edge-case scenario suite — it's the scenarios (stale assertions, randomness, timing: ISS-102/103/105 + friendly-fire), not the mechanics, that redden CI; classify/disposition each and decide the edge-step CI policy |
 | ISS-106 | [ISS-106_20260709_php_empty_array_skill_payload_start_failure.md](ISS-106_20260709_php_empty_array_skill_payload_start_failure.md) | Low | Open | Data half (PHP-era `[]` skill payloads 400 arena start) vanishes on the prod DB wipe; surviving half: hub `Join` answers `matched` even when engine-start fails, stranding the client on an arena-less match |
 | ISS-105 | [ISS-105_20260709_cli_token_starvation_long_fights.md](ISS-105_20260709_cli_token_starvation_long_fights.md) | Low | Open | CLI scenarios idling > 15 min between requests 401 mid-fight (sliding renewal never engages; Sanctum never expired) — flakes `e2e_archetype_pve_full_fight` on long fights |
 | ISS-104 | [ISS-104_20260708_matchmaking_parallel_join_queue_poison.md](ISS-104_20260708_matchmaking_parallel_join_queue_poison.md) | High | Open | Parallel matchmaking joins can strand a queue entry; the strand self-perpetuates, pairing every later 1v1_PVE joiner with the previous victim's match (403 on game state) |
