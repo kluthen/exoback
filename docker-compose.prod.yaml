@@ -1,6 +1,14 @@
 # docker-compose.prod.yaml — Production Stack
 # Built for persistence, reliability, and automated orchestration.
 # Usage: ./scripts/setup_prod.sh && docker compose -f docker-compose.prod.yaml up -d --wait
+#
+# Post-cutover shape (Phase 6 §E): one hub image serves the API, SSE and the
+# SPA; db-init adopts the Laravel-migrated database (-migrate-mode baseline
+# stamps 000001 as applied, then applies 000002+). Caddy stays the front door,
+# publishing the historical client port 8000 — its healthcheck doubles as the
+# hub's (the distroless hub image has no shell for an in-container one).
+# The one-time DB handover runbook lives in
+# reporting/battleui_migration/08_phase6_cutover_report.md.
 
 name: upsilon-prod
 
@@ -22,71 +30,43 @@ services:
 
   db-init:
     build:
-      context: ./battleui
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_REVERB_APP_KEY=${VITE_REVERB_APP_KEY}
-        - VITE_REVERB_HOST=${VITE_REVERB_HOST}
-        - VITE_REVERB_PORT=${VITE_REVERB_PORT}
-        - VITE_REVERB_SCHEME=${VITE_REVERB_SCHEME}
-    user: "33:33" # Run as www-data to ensure log permissions
-    command: php artisan migrate --force
+      context: .
+      dockerfile: ./upsilonhub/Dockerfile
+    command: [ "-migrate-mode", "baseline" ]
     depends_on:
       db:
         condition: service_healthy
     env_file:
       - .env
 
-  app:
+  hub:
     build:
-      context: ./battleui
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_REVERB_APP_KEY=${VITE_REVERB_APP_KEY}
-        - VITE_REVERB_HOST=${VITE_REVERB_HOST}
-        - VITE_REVERB_PORT=${VITE_REVERB_PORT}
-        - VITE_REVERB_SCHEME=${VITE_REVERB_SCHEME}
+      context: .
+      dockerfile: ./upsilonhub/Dockerfile
     depends_on:
       db:
         condition: service_healthy
       db-init:
         condition: service_completed_successfully
-    ports:
-      - "8000:80"
     env_file:
       - .env
+
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      - HUB_UPSTREAM=hub:8090
+    volumes:
+      - ./upsilonhub/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      - "8000:8085"
+    depends_on:
+      - hub
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost/up" ]
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8085/up" ]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 15s
-
-  ws:
-    build:
-      context: ./battleui
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_REVERB_APP_KEY=${VITE_REVERB_APP_KEY}
-        - VITE_REVERB_HOST=${VITE_REVERB_HOST}
-        - VITE_REVERB_PORT=${VITE_REVERB_PORT}
-        - VITE_REVERB_SCHEME=${VITE_REVERB_SCHEME}
-    command: php artisan reverb:start --host=0.0.0.0 --port=8080
-    depends_on:
-      db:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
-    ports:
-      - "8080:8080"
-    env_file:
-      - .env
-    healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8080" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
 
   engine:
     build:
@@ -109,9 +89,7 @@ services:
       context: .
       dockerfile: ./upsiloncli/Dockerfile
     depends_on:
-      app:
-        condition: service_healthy
-      ws:
+      proxy:
         condition: service_healthy
       engine:
         condition: service_healthy

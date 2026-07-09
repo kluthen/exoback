@@ -1,6 +1,10 @@
 # docker-compose.ci.yaml — Ephemeral CI Stack
 # Optimized for speed (tmpfs), reliability (healthchecks), and determinism.
 # Usage: docker compose -f docker-compose.ci.yaml up -d --wait
+#
+# Post-cutover shape (Phase 6 §E): the hub owns migrations, seeding, the API,
+# SSE and the SPA. Caddy is the front door on :8085 — its healthcheck doubles
+# as the hub's (the distroless hub image has no shell for an in-container one).
 
 services:
   db:
@@ -16,74 +20,62 @@ services:
       retries: 15
       start_period: 30s
 
-  db-init:
+  hub-migrate:
     build:
-      context: ./battleui
-      args:
-        - VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
-        - VITE_REVERB_HOST=${REVERB_HOST}
-        - VITE_REVERB_PORT=${REVERB_PORT}
-        - VITE_REVERB_SCHEME=${REVERB_SCHEME}
-    command: php artisan migrate:fresh --seed --force
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
-
-  app:
-    build:
-      context: ./battleui
-      args:
-        - VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
-        - VITE_REVERB_HOST=${REVERB_HOST}
-        - VITE_REVERB_PORT=${REVERB_PORT}
-        - VITE_REVERB_SCHEME=${REVERB_SCHEME}
-    depends_on:
-      db:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
+      context: .
+      dockerfile: ./upsilonhub/Dockerfile
+    command: [ "-migrate-mode", "full" ]
     environment:
-      - REVERB_HOST=ws
-      - REVERB_PORT=8080
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon
+    depends_on:
+      db:
+        condition: service_healthy
+
+  hub-seed:
+    build:
+      context: .
+      dockerfile: ./upsilonhub/Dockerfile
+    command: [ "-seed" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon
     env_file:
-      - .env
+      - .env # ADMIN_INITIAL_PASSWORD gates the admin seed block
+    depends_on:
+      hub-migrate:
+        condition: service_completed_successfully
+
+  hub:
+    build:
+      context: .
+      dockerfile: ./upsilonhub/Dockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon
+      # Exception-prefix parity ("-- DEBUG MODE -- ") — the CLI edge suites
+      # assert it, matching Laravel's testing env.
+      - APP_DEBUG=true
+      - UPSILON_API_URL=http://engine:8081
+      - UPSILON_WEBHOOK_URL=http://proxy:8085/api/webhook/upsilon
+    depends_on:
+      hub-seed:
+        condition: service_completed_successfully
+
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      - HUB_UPSTREAM=hub:8090
+    volumes:
+      - ./upsilonhub/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
-      - "8000:80"
+      - "8085:8085"
+    depends_on:
+      - hub
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost/up" ]
+      # Proves the whole chain: proxy → hub → /up liveness route.
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8085/up" ]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 15s
-
-  ws:
-    build:
-      context: ./battleui
-      args:
-        - VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
-        - VITE_REVERB_HOST=${REVERB_HOST}
-        - VITE_REVERB_PORT=${REVERB_PORT}
-        - VITE_REVERB_SCHEME=${REVERB_SCHEME}
-    command: php artisan reverb:start --host=0.0.0.0 --port=8080
-    depends_on:
-      db:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
-    environment:
-      - REVERB_HOST=0.0.0.0
-    env_file:
-      - .env
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8080" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
 
   engine:
     build:
@@ -106,17 +98,14 @@ services:
       context: .
       dockerfile: ./upsiloncli/Dockerfile
     environment:
-      - UPSILON_BASE_URL=http://app
-      - REVERB_HOST=ws
-      - REVERB_PORT=8080
-      - REVERB_APP_KEY=ci_app_key
+      - UPSILON_BASE_URL=http://proxy:8085
       - UPSILON_CLI_PATH=upsiloncli
     volumes:
       - ./upsiloncli/samples:/app/upsiloncli/samples
       - ./upsiloncli/tests:/app/upsiloncli/tests
       - ./upsiloncli/internal:/app/upsiloncli/internal
     depends_on:
-      app:
+      proxy:
         condition: service_healthy
-      ws:
+      engine:
         condition: service_healthy

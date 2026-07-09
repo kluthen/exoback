@@ -17,8 +17,6 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres
     ports:
-      - "8000:8000"
-      - "8080:8080"
       - "5173:5173"
       - "8081:8081"
       - "8090:8090"
@@ -29,8 +27,8 @@ services:
       - ollama_network
 
   proxy:
-    # Side-by-side cutover proxy: /api/v1/auth/* → hub (:8090), rest → Laravel
-    # (:8000). Front door for the migration is :8085.
+    # Stable front door (:8085) → the hub (:8090 inside the app devcontainer),
+    # which serves the API, SSE and the SPA since the Phase 6 cutover.
     image: caddy:2-alpine
     depends_on:
       - app
