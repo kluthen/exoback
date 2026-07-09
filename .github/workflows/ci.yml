@@ -30,7 +30,7 @@ jobs:
         run: go work sync
 
       - name: Go Vet (Explicit Modules)
-        run: go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/...
+        run: go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/...
 
       - name: Build Upsilon API
         run: go build -o /dev/null ./upsilonapi
@@ -38,10 +38,13 @@ jobs:
       - name: Build Upsilon CLI
         run: go build -o /dev/null ./upsiloncli/cmd/upsiloncli
 
+      - name: Build Upsilon Hub
+        run: go build -o /dev/null ./upsilonhub/cmd/upsilonhub
+
       - name: Verify Dockerfiles
         run: |
-          echo "Checking battleui Dockerfile..."
-          docker build --check -f battleui/Dockerfile battleui/ 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
+          echo "Checking upsilonhub Dockerfile..."
+          docker build --check -f upsilonhub/Dockerfile . 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
           echo "Checking upsilonapi Dockerfile..."
           docker build --check -f upsilonapi/Dockerfile . 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
 
@@ -76,7 +79,9 @@ jobs:
         run: go work sync
 
       - name: Run Go Tests (Explicit Modules)
-        run: go test -count=1 -timeout 120s -json ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... > go-test-results.json 2>&1 || true
+        # 600s: the hub feature tests boot throwaway Postgres containers
+        # (testcontainers) — the first image pull eats into the timeout.
+        run: go test -count=1 -timeout 600s -json ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... > go-test-results.json 2>&1 || true
 
       - name: Check for Failures
         run: |
@@ -94,76 +99,9 @@ jobs:
           path: go-test-results.json
           retention-days: 3
 
-  php-tests:
-    name: PHP Unit Tests
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code with Submodules
-        uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      - name: Build Battleui Docker Image
-        run: docker build -t battleui-ci ./battleui
-
-      - name: Build Test Image (dev dependencies)
-        # The production image is built --no-dev, so phpunit / `artisan test` are
-        # absent. Install dev deps now (build time) so the test run needs no
-        # internet — it only talks to the ephemeral Postgres on an isolated net.
-        run: |
-          printf 'FROM battleui-ci\nRUN composer install --no-interaction --quiet\n' \
-            | docker build -t battleui-citest -
-
-      - name: Run PHPUnit (PostgreSQL)
-        # The migrations use Postgres-only DDL (ALTER TABLE ... ADD CONSTRAINT
-        # ... CHECK) that SQLite cannot build, so tests must run on Postgres.
-        # We provision an ephemeral postgres:18 on a dedicated network and point
-        # PHPUnit at it. APP_KEY is injected (.env is .dockerignore'd so
-        # key:generate fails) and phpunit.xml is bind-mounted (also .dockerignore'd).
-        # `set -o pipefail` makes the step fail on the real test exit code.
-        run: |
-          set -eo pipefail
-          APP_KEY=$(grep -E '^APP_KEY=' .env.ci | head -1 | cut -d= -f2-)
-          docker network create phpunit-net
-          docker run -d --name phpunit-db --network phpunit-net \
-            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=testing \
-            postgres:18-alpine
-          for i in $(seq 1 30); do
-            docker exec phpunit-db pg_isready -U postgres && break
-            sleep 1
-          done
-          docker run --rm --network phpunit-net \
-            -e APP_ENV=testing \
-            -e APP_KEY="$APP_KEY" \
-            -e DB_CONNECTION=pgsql \
-            -e DB_HOST=phpunit-db \
-            -e DB_PORT=5432 \
-            -e DB_DATABASE=testing \
-            -e DB_USERNAME=postgres \
-            -e DB_PASSWORD=postgres \
-            -v "$PWD/battleui/phpunit.xml:/var/www/html/phpunit.xml:ro" \
-            battleui-citest \
-            sh -c "php artisan test --exclude-group=engine-required 2>&1" | tee php-test-results.txt
-
-      - name: Teardown PHPUnit Postgres
-        if: always()
-        run: |
-          docker rm -f phpunit-db || true
-          docker network rm phpunit-net || true
-
-      - name: Upload PHP Test Results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: php-test-results
-          path: php-test-results.txt
-          retention-days: 3
-
   unit-test-summary:
     name: Unit Test Summary
-    needs: [go-tests, php-tests]
+    needs: [go-tests]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -174,12 +112,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: go-test-results
-          path: .
-
-      - name: Download PHP Results
-        uses: actions/download-artifact@v8
-        with:
-          name: php-test-results
           path: .
 
       - name: Generate Unit Report
@@ -209,21 +141,18 @@ jobs:
         run: |
           cp .env.ci .env
           mkdir -p upsiloncli/tests/logs
-          sed -i 's/REVERB_HOST=127.0.0.1/REVERB_HOST=localhost/' .env
 
       - name: Setup Node.js (for Playwright)
-        if: false # Playwright temporarily disabled in CI, see issue tracker
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: 'npm'
-          cache-dependency-path: battleui/package-lock.json
+          cache-dependency-path: upsilonbattleui/package-lock.json
 
       - name: Install Playwright Dependencies
-        if: false # Playwright temporarily disabled in CI, see issue tracker
         run: |
-          cd battleui
-          npm install
+          cd upsilonbattleui
+          npm ci
           npx playwright install --with-deps chromium
 
       - name: Boot Upsilon Services (Built Once)
@@ -233,11 +162,13 @@ jobs:
         run: docker compose -f docker-compose.ci.yaml ps
 
       - name: "E2E: Run Playwright Tests"
-        if: false # Playwright temporarily disabled in CI, see issue tracker
+        # --workers=1: parallel matchmaking joins race (ISS-104) and runner
+        # memory both punish parallel workers. Visual specs may still fail on
+        # a GPU-less runner (ISS-100), hence continue-on-error.
         continue-on-error: true
         run: |
-          cd battleui
-          PLAYWRIGHT_SKIP_SERVER=1 npx playwright test
+          cd upsilonbattleui
+          PLAYWRIGHT_BASE_URL=http://localhost:8085 npx playwright test --workers=1
 
       - name: "E2E: Run Centralized Customer Scenarios"
         continue-on-error: true
@@ -260,7 +191,7 @@ jobs:
           fi
 
           echo "### Playwright Test Results" >> $GITHUB_STEP_SUMMARY
-          if [ -d "battleui/playwright-report" ]; then
+          if [ -d "upsilonbattleui/playwright-report" ]; then
             echo "✅ HTML Report generated." >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ No HTML Report found." >> $GITHUB_STEP_SUMMARY
@@ -270,8 +201,9 @@ jobs:
         if: failure()
         run: |
           mkdir -p ci_logs
-          docker compose -f docker-compose.ci.yaml logs app > ci_logs/laravel.log 2>&1
-          docker compose -f docker-compose.ci.yaml logs ws > ci_logs/reverb.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs hub-migrate hub-seed > ci_logs/hub-init.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs hub > ci_logs/hub.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs proxy > ci_logs/proxy.log 2>&1
           docker compose -f docker-compose.ci.yaml logs engine > ci_logs/engine.log 2>&1
           docker compose -f docker-compose.ci.yaml logs db > ci_logs/db.log 2>&1
           docker compose -f docker-compose.ci.yaml logs tester > ci_logs/tester.log 2>&1
@@ -284,7 +216,7 @@ jobs:
           path: |
             ci_report.md
             edge_case_report.md
-            battleui/playwright-report/
+            upsilonbattleui/playwright-report/
             ci_logs/
             upsiloncli/tests/logs/
           retention-days: 3
