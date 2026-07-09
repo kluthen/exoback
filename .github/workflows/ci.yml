@@ -19,6 +19,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+          # The submodules are separate PRIVATE repos; the default GITHUB_TOKEN
+          # can't read sibling repos, so cloning them needs a token with
+          # org-wide `contents: read`. Falls back to the default token when the
+          # secret is unset (main repo still checks out; submodules won't).
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -68,6 +73,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+          # The submodules are separate PRIVATE repos; the default GITHUB_TOKEN
+          # can't read sibling repos, so cloning them needs a token with
+          # org-wide `contents: read`. Falls back to the default token when the
+          # secret is unset (main repo still checks out; submodules won't).
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -136,39 +146,30 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+          # The submodules are separate PRIVATE repos; the default GITHUB_TOKEN
+          # can't read sibling repos, so cloning them needs a token with
+          # org-wide `contents: read`. Falls back to the default token when the
+          # secret is unset (main repo still checks out; submodules won't).
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       - name: Prepare Environment
         run: |
           cp .env.ci .env
           mkdir -p upsiloncli/tests/logs
 
-      - name: Setup Node.js (for Playwright)
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: 'npm'
-          cache-dependency-path: upsilonbattleui/package-lock.json
-
-      - name: Install Playwright Dependencies
-        run: |
-          cd upsilonbattleui
-          npm ci
-          npx playwright install --with-deps chromium
+      # NOTE: Playwright (browser E2E from upsilonbattleui) is temporarily
+      # excluded from CI — it used to run from the dev environment and is a
+      # later item to re-wire (GPU-less runner / ISS-100 visual specs, ISS-104
+      # parallel-join race). The upsiloncli scenario + edge suites below remain
+      # the CI E2E gate. To restore: re-add the Node.js setup, `npm ci`,
+      # `npx playwright install --with-deps chromium`, and the Playwright run
+      # step (`--workers=1`), plus the playwright-report artifact path.
 
       - name: Boot Upsilon Services (Built Once)
         run: docker compose -f docker-compose.ci.yaml up -d --wait --wait-timeout 300
 
       - name: Show Service Status
         run: docker compose -f docker-compose.ci.yaml ps
-
-      - name: "E2E: Run Playwright Tests"
-        # --workers=1: parallel matchmaking joins race (ISS-104) and runner
-        # memory both punish parallel workers. Visual specs may still fail on
-        # a GPU-less runner (ISS-100), hence continue-on-error.
-        continue-on-error: true
-        run: |
-          cd upsilonbattleui
-          PLAYWRIGHT_BASE_URL=http://localhost:8085 npx playwright test --workers=1
 
       - name: "E2E: Run Centralized Customer Scenarios"
         continue-on-error: true
@@ -190,13 +191,6 @@ jobs:
             cat edge_case_report.md >> $GITHUB_STEP_SUMMARY
           fi
 
-          echo "### Playwright Test Results" >> $GITHUB_STEP_SUMMARY
-          if [ -d "upsilonbattleui/playwright-report" ]; then
-            echo "✅ HTML Report generated." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ No HTML Report found." >> $GITHUB_STEP_SUMMARY
-          fi
-
       - name: Collect Docker Logs on Failure
         if: failure()
         run: |
@@ -216,7 +210,6 @@ jobs:
           path: |
             ci_report.md
             edge_case_report.md
-            upsilonbattleui/playwright-report/
             ci_logs/
             upsiloncli/tests/logs/
           retention-days: 3
