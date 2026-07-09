@@ -26,7 +26,7 @@ services:
       dockerfile: ./upsilonhub/Dockerfile
     command: [ "-migrate-mode", "full" ]
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon?sslmode=disable
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +37,7 @@ services:
       dockerfile: ./upsilonhub/Dockerfile
     command: [ "-seed" ]
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon?sslmode=disable
     env_file:
       - .env # ADMIN_INITIAL_PASSWORD gates the admin seed block
     depends_on:
@@ -49,7 +49,7 @@ services:
       context: .
       dockerfile: ./upsilonhub/Dockerfile
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilon?sslmode=disable
       # Exception-prefix parity ("-- DEBUG MODE -- ") — the CLI edge suites
       # assert it, matching Laravel's testing env.
       - APP_DEBUG=true

@@ -154,6 +154,7 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 
 | Name | Date | Status | Severity | Oneliner |
 |---|---|---|---|---|
+| [Stored skill payloads with PHP-era `[]` empty objects break arena start; join still reports "matched"](issues/ISS-106_20260709_php_empty_array_skill_payload_start_failure.md) | 2026-07-09 | Open | Medium | Two stacked defects, found during the Phase 6 E6 resurrection drill: |
 | [CLI scenarios that idle past TokenTTL between requests 401 mid-fight](issues/ISS-105_20260709_cli_token_starvation_long_fights.md) | 2026-07-09 | Open | Low | Hub tokens have `TokenTTL = 15m` with sliding renewal after 10m (`identity.go... |
 | [Parallel joins can strand a queue entry that then poisons every later 1v1_PVE join](issues/ISS-104_20260708_matchmaking_parallel_join_queue_poison.md) | 2026-07-08 | Open | High | `Matchmaker.Join` enqueues the joiner, then takes `QueueHead(scope, required)... |
 | [e2e_battle_starts_privacy_check asserts foe-loadout masking that no stack ever implemented](issues/ISS-103_20260707_privacy_check_asserts_unimplemented_masking.md) | 2026-07-07 | Open | Medium | `e2e_battle_starts_privacy_check` asserts foe entities expose no `equipped_sk... |
