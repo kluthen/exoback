@@ -10,7 +10,7 @@
 
 | Ref | File | Severity | Status | Summary |
 |---|---|---|---|---|
-| ISS-106 | [ISS-106_20260709_php_empty_array_skill_payload_start_failure.md](ISS-106_20260709_php_empty_array_skill_payload_start_failure.md) | Medium | Open | PHP-era `[]` empty-object skill payloads (e.g. `targeting.Zone: []`) 400 the engine's arena start; hub `Join` still answers `matched`, stranding the client on an arena-less match |
+| ISS-106 | [ISS-106_20260709_php_empty_array_skill_payload_start_failure.md](ISS-106_20260709_php_empty_array_skill_payload_start_failure.md) | Low | Open | Data half (PHP-era `[]` skill payloads 400 arena start) vanishes on the prod DB wipe; surviving half: hub `Join` answers `matched` even when engine-start fails, stranding the client on an arena-less match |
 | ISS-105 | [ISS-105_20260709_cli_token_starvation_long_fights.md](ISS-105_20260709_cli_token_starvation_long_fights.md) | Low | Open | CLI scenarios idling > 15 min between requests 401 mid-fight (sliding renewal never engages; Sanctum never expired) — flakes `e2e_archetype_pve_full_fight` on long fights |
 | ISS-104 | [ISS-104_20260708_matchmaking_parallel_join_queue_poison.md](ISS-104_20260708_matchmaking_parallel_join_queue_poison.md) | High | Open | Parallel matchmaking joins can strand a queue entry; the strand self-perpetuates, pairing every later 1v1_PVE joiner with the previous victim's match (403 on game state) |
 | ISS-103 | [ISS-103_20260707_privacy_check_asserts_unimplemented_masking.md](ISS-103_20260707_privacy_check_asserts_unimplemented_masking.md) | Medium | Open | e2e_battle_starts_privacy_check asserts foe-loadout masking neither Laravel nor the hub ever implemented (ISS-077 contract) |

@@ -3,12 +3,18 @@
 # Usage: ./scripts/setup_prod.sh && docker compose -f docker-compose.prod.yaml up -d --wait
 #
 # Post-cutover shape (Phase 6 §E): one hub image serves the API, SSE and the
-# SPA; db-init adopts the Laravel-migrated database (-migrate-mode baseline
-# stamps 000001 as applied, then applies 000002+). Caddy stays the front door,
-# publishing the historical client port 8000 — its healthcheck doubles as the
-# hub's (the distroless hub image has no shell for an in-container one).
-# The one-time DB handover runbook lives in
-# reporting/battleui_migration/08_phase6_cutover_report.md.
+# SPA; db-init runs -migrate-mode full against a fresh database (the old prod DB
+# is wiped, not adopted — decision 2026-07-09), applying 000001 + 000002+ from
+# scratch. Caddy stays the front door, publishing the historical client port
+# 8000 — its healthcheck doubles as the hub's (the distroless hub image has no
+# shell for an in-container one).
+#
+# NOTE: -migrate-mode baseline (adopt a Laravel-migrated DB, stamp 000001 as
+# already-applied) is intentionally NOT used here — it would mark 000001 as
+# applied *without running it* on an empty DB, then 000002 would ALTER a table
+# that was never created. Only use baseline against a DB that already carries
+# the Laravel schema. The baseline path + adoption runbook are preserved in
+# reporting/battleui_migration/08_phase6_cutover_report.md for reference.
 
 name: upsilon-prod
 
@@ -32,7 +38,7 @@ services:
     build:
       context: .
       dockerfile: ./upsilonhub/Dockerfile
-    command: [ "-migrate-mode", "baseline" ]
+    command: [ "-migrate-mode", "full" ]
     depends_on:
       db:
         condition: service_healthy
