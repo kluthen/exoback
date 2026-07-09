@@ -67,6 +67,12 @@ jobs:
     name: Go Unit Tests
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # The gateway suite shares one Postgres testcontainer across ~140 tests;
+      # on ephemeral CI runners the testcontainers Ryuk reaper can collect it
+      # mid-run (later tests then see "connection refused/reset"). The runner VM
+      # is destroyed after the job, so container cleanup is moot — disable Ryuk.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
 
     steps:
       - name: Checkout Code with Submodules
