@@ -4,7 +4,7 @@
 **Ref:** `ISS-104`
 **Date:** 2026-07-08
 **Severity:** High
-**Status:** Fix applied 2026-07-09 (pending CI verification) — see "Resolution"
+**Status:** Open
 **Component:** `upsilonhub/internal/games/battle/matchmaking.go` (`Join` / `QueueHead`)
 **Affects:** Playwright `battle_arena.spec.ts` / `battle_debug.spec.ts` when run with parallel workers; any two humans joining the same mode near-simultaneously
 
