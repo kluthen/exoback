@@ -5,7 +5,7 @@ human_name: Upsilon Hub Vision
 priority: 1
 tags: [governance, vision, root]
 dependents:
-  - [[battleui:vision_ui_vision]]
+  - [[upsilonbattleui:vision_ui_vision]]
   - [[upsilonapi:vision_api_vision]]
   - [[upsilonbattle:vision_battle_vision]]
   - [[upsiloncli:vision_cli_vision]]

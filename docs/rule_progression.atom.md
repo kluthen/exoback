@@ -11,8 +11,8 @@ parents:
   - [[requirement_customer_player_profile]]
   - [[upsilontypes:entity_character]]
 dependents:
-  - [[battleui:uc_progression_stat_allocation]]
-  - [[battleui:ui_character_full_stat_panel]]
+  - [[upsilonbattleui:uc_progression_stat_allocation]]
+  - [[upsilonbattleui:ui_character_full_stat_panel]]
   - [[rule_stat_taxonomy]]
   - [[upsilonbattle:mechanic_character_point_buy_system]]
   - [[upsilonbattle:mechanic_exotic_attribute_progression]]

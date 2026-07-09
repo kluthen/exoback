@@ -9,7 +9,7 @@ parents:
 type: RULE
 tags: [stats, progression, items, iss-074]
 dependents:
-  - [[battleui:ui_character_full_stat_panel]]
+  - [[upsilonbattleui:ui_character_full_stat_panel]]
 layer: BUSINESS
 ---
 

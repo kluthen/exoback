@@ -9,7 +9,7 @@ priority: 3
 tags: [tech-debt, escape-hatch, governance]
 parents: []
 dependents:
-  - [[battleui:ui_leaderboard]]
+  - [[upsilonbattleui:ui_leaderboard]]
   - [[req_matchmaking]]
   - [[req_security]]
   - [[us_character_reroll]]

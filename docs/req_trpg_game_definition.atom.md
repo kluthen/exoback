@@ -7,9 +7,9 @@ type: REQUIREMENT
 priority: 5
 tags: [trpg, combat, game-definition]
 parents:
-  - [[battleui:req_player_experience]]
+  - [[upsilonbattleui:req_player_experience]]
 dependents:
-  - [[battleui:ui_battle_arena]]
+  - [[upsilonbattleui:ui_battle_arena]]
   - [[mechanic_battle_engine_stress_testing]]
   - [[upsilonbattle:req_skill_generation]]
 human_name: TRPG Game Definition

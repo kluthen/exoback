@@ -8,7 +8,7 @@ status: STABLE
 priority: 3
 tags: [auth, logout, experience]
 parents:
-  - [[battleui:req_player_experience]]
+  - [[upsilonbattleui:req_player_experience]]
   - [[req_admin_experience]]
 dependents:
   - [[uc_auth_logout]]

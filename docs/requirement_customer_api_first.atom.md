@@ -7,7 +7,7 @@ layer: BUSINESS
 version: 1.0
 tags: api,documentation,developer-experience
 parents:
-  - [[battleui:req_player_experience]]
+  - [[upsilonbattleui:req_player_experience]]
 priority: 3
 dependents:
   - [[us_api_flow_game_turn]]

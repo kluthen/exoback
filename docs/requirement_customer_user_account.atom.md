@@ -7,7 +7,7 @@ human_name: User Account Identity Management
 priority: 3
 tags: [auth, identity, account]
 dependents:
-  - [[battleui:ui_modal_box]]
+  - [[upsilonbattleui:ui_modal_box]]
   - [[upsilonapi:api_auth_user]]
   - [[upsilonapi:rule_gdpr_compliance]]
   - [[upsilonapi:rule_password_policy]]

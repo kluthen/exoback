@@ -19,8 +19,8 @@
       "path": "upsilonbattle"
     },
     {
-      "name": "battleui",
-      "path": "battleui"
+      "name": "upsilonbattleui",
+      "path": "upsilonbattleui"
     },
     {
       "name": "upsiloncli",

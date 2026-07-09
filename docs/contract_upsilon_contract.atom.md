@@ -9,7 +9,7 @@ human_name: Upsilon Hub Contract
 type: CONTRACT
 layer: BUSINESS
 dependents:
-  - [[battleui:contract_ui_contract]]
+  - [[upsilonbattleui:contract_ui_contract]]
   - [[rule_code_health_monitoring]]
   - [[rule_dto_strict_typing]]
   - [[upsilonapi:contract_api_contract]]

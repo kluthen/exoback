@@ -8,7 +8,7 @@ status: STABLE
 priority: 5
 tags: []
 parents:
-  - [[battleui:req_player_experience]]
+  - [[upsilonbattleui:req_player_experience]]
 dependents:
   - [[us_api_flow_game_turn]]
   - [[us_take_combat_turn]]
