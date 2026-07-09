@@ -1,6 +1,3 @@
-[submodule "battleui"]
-	path = battleui
-	url = ../battleui.git
 [submodule "upsilonbattle"]
 	path = upsilonbattle
 	url = ../upsilonbattle.git
