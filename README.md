@@ -24,30 +24,33 @@
 The UpsilonBattle ecosystem is built as a modular multi-repo system. Each core component is maintained in its own repository and integrated into this main project as a formal **Git Submodule**.
 
 ### Repository Structure
-1. **Frontend (`battleui`)**:
-   - Built with Laravel, Vue.js, and Tailwind CSS.
-   - Manages user sessions, JWT authentication, and player matchmaking.
-   - Provides the visual interface for combat and the global leaderboard.
+1. **Frontend (`upsilonbattleui`)**:
+   - Standalone Vue 3 + Vite SPA (vue-router, Tailwind CSS, TresJS 3D).
+   - Served by the hub; talks to `/api/v1` with bearer tokens and listens on the SSE event stream.
 
-2. **Backend API (`upsilonapi`)**:
+2. **Platform Gateway (`upsilonhub`)**:
+   - Go service owning auth/identity, matchmaking, economy/loadout, admin, realtime SSE and the database schema.
+   - One image serves the API + SPA, runs migrations (`-migrate-mode`) and seeds (`-seed`).
+
+3. **Backend API (`upsilonapi`)**:
    - A high-performance Go JSON API.
    - Handles account management, character statistics, and match state persistence.
 
-3. **Battle Engine (`upsilonbattle`)**:
+4. **Battle Engine (`upsilonbattle`)**:
    - The "calculating brain" that governs active combat sequences.
    - Mathematically simulates initiative, movement validation, and damage systems.
 
-4. **Journey Explorer CLI (`upsiloncli`)**:
+5. **Journey Explorer CLI (`upsiloncli`)**:
    - An interactive terminal tool for API exploration and verification.
    - Supports "Autopilot" sessions to simulate full player journeys.
 
-5. **Shared Assets & Utilities**:
+6. **Shared Assets & Utilities**:
    - `upsilonmapdata`: Geometric board data and obstacle definitions.
    - `upsilonmapmaker`: Procedural generation tools for game boards.
    - `upsilontools`: Common TRPG utilities and helper functions.
    - `upsilontypes`: Shared type definitions and domain models used across all modules.
 
-6. **AWS Infrastructure (`upsilonaws`)**:
+7. **AWS Infrastructure (`upsilonaws`)**:
    - Bash-based provisioning scripts for deploying the full stack to AWS (eu-west-3).
    - Manages: VPC, EC2 (t3.medium), RDS PostgreSQL 15, Route 53 DNS, nginx + Let's Encrypt SSL.
    - Public endpoint: [upsilon-hub.com](https://upsilon-hub.com) — run `setup.sh` to provision, `teardown.sh` to wipe everything.
@@ -74,30 +77,22 @@ git submodule update --init --recursive
 #### DevContainer Environment
 The project provides a pre-configured development environment via **[.devcontainer/](.devcontainer/)**. This is the recommended way to develop for Upsilon, ensuring a consistent environment across all platforms.
 
-- **Stack:** PHP 8.4, Go, Node.js 20.
-- **Tools:** Includes Composer, Postgres client, and ATD integration tools.
+- **Stack:** Go, Node.js 20.
+- **Tools:** Postgres client and ATD integration tools.
 - **Port Forwarding:**
-  - `8000`: Laravel App
-  - `8080`: Reverb (WebSockets)
+  - `8085`: Caddy front door (hub API + SSE + SPA)
+  - `8090`: Upsilon Hub (direct)
   - `8081`: Upsilon Engine (Go API)
-  - `5173`: Vue Frontend (HMR)
+  - `5173`: Vue Frontend (Vite dev server, HMR)
 
-> **Running PHP unit tests:** the suite runs against **PostgreSQL** (the
-> migrations use Postgres-only DDL that SQLite cannot build), so a dedicated
-> `testing` database must exist on the `db` service. Create it once, then run
-> the tests from `battleui/`:
-> ```bash
-> # inside the dev container
-> psql -h db -U postgres -c 'CREATE DATABASE testing;'   # password: postgres (one-time)
-> cd battleui && php artisan test
-> ```
-> Connection defaults (host `db`, database `testing`, user/pass `postgres`) live
-> in `battleui/phpunit.xml`.
+> **Running hub feature tests:** they boot throwaway Postgres containers via
+> testcontainers — Docker must be reachable from the environment running
+> `go test ./upsilonhub/...`.
 
 #### Service Management
 The project includes a suite of scripts in the `scripts/` directory for local service management and testing:
 
-- **[scripts/start_services.sh](scripts/start_services.sh)**: Launches the full Upsilon stack (Laravel API, Reverb Server, Vue Frontend, and Upsilon Engine) in the background. It automatically verifies that all ports are listening before exiting.
+- **[scripts/start_services.sh](scripts/start_services.sh)**: Launches the full Upsilon stack (Upsilon Engine, Upsilon Hub, and Vite dev server) in the background. It automatically verifies that all ports are listening before exiting.
 - **[scripts/stop_services.sh](scripts/stop_services.sh)**: Gracefully stops all tracked services and ensures ports are freed.
 - **[scripts/check_services.sh](scripts/check_services.sh)**: Lightweight status utility for quick health checks of the local stack.
 - **[scripts/watch_services.go](scripts/watch_services.go)**: Real-time TUI dashboard for monitoring CPU/Mem usage and recent errors across all services. Run with `go run scripts/watch_services.go`.
@@ -115,12 +110,12 @@ The project includes a suite of scripts in the `scripts/` directory for local se
 UpsilonBattle employs a robust CI/CD pipeline via GitHub Actions to ensure code quality, architectural integrity, and business rule compliance.
 
 ### Automated Workflows (`.github/workflows/`)
-- **[Unit Tests](.github/workflows/unit-tests.yml)**: Runs Go unit tests for all backend modules and PHP unit tests for the Laravel frontend.
+- **[Unit Tests](.github/workflows/unit-tests.yml)**: Runs Go unit tests for all backend modules (including the hub's testcontainers feature suites).
 - **[Lint & Build](.github/workflows/lint-and-build.yml)**: Performs static analysis (Go vet) and verifies that all core components and Docker images build successfully.
 - **[E2E Battle Tests](.github/workflows/e2e-battles.yml)**: Orchestrates a full ephemeral Docker stack to run integration tests. It uses specialized CLI bots to simulate real player journeys and verify complex game mechanics.
 
 ### Code Health Standards (`scripts/code_health_check.py`)
-Upsilon enforces strict maintainability standards across all supported languages (Go, Python, PHP, JS, Vue). These are verified locally via the pre-commit hook and in CI.
+Upsilon enforces strict maintainability standards across all supported languages (Go, Python, JS, Vue). These are verified locally via the pre-commit hook and in CI.
 
 - **File Length:** Maximum 300 LOC (Warning), 500 LOC (Error).
 - **Complexity:** Function nesting depth must not exceed 3 levels.
@@ -140,9 +135,9 @@ The project utilizes a dedicated **[docker-compose.ci.yaml](docker-compose.ci.ya
 
 - **Components:**
   - `db`: Postgres 18-alpine database.
-  - `db-init`: Migration and seeding service.
-  - `app`: The Laravel application.
-  - `ws`: Reverb WebSocket server.
+  - `hub-migrate` / `hub-seed`: hub-image init containers (schema + seed).
+  - `hub`: the platform gateway serving API + SSE + SPA.
+  - `proxy`: Caddy front door on `:8085` (its healthcheck gates the stack).
   - `engine`: The Upsilon Battle Engine (Go).
   - `tester`: The Upsilon CLI running in integration mode.
 - **Usage:**

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 cd "$(dirname "$0")/.."
-# Clear ghost matches from the database
+# Clear ghost matches (and stranded queue entries, see ISS-104) from the database
 
 echo "Clearing matches..."
-cd /workspace/battleui || exit 1
-php artisan tinker --execute="DB::statement('TRUNCATE table game_matches CASCADE'); DB::statement('TRUNCATE table match_participants CASCADE'); echo 'Matches and participants cleared.'; echo \"\n\";"
+psql "${DATABASE_URL:?DATABASE_URL is mandatory}" -q <<'SQL'
+TRUNCATE table game_matches CASCADE;
+TRUNCATE table match_participants CASCADE;
+TRUNCATE table matchmaking_queues;
+SQL
 echo "Done!"

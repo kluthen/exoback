@@ -6,7 +6,7 @@
 # runs the same three stages defined in .github/workflows/ci.yml:
 #
 #   1. Build & Lint        — go work sync, go vet, go build, Dockerfile checks
-#   2. Unit Tests          — Go tests + PHP/PHPUnit (SQLite in-memory, dockerized)
+#   2. Unit Tests          — Go tests (hub feature tests use testcontainers)
 #   3. Integration & E2E   — docker-compose.ci stack + Playwright + scenarios + edge cases
 #
 # Usage:
@@ -197,8 +197,6 @@ prepare_env() {
     cd "$TARGET_DIR"
     cp .env.ci .env
     mkdir -p upsiloncli/tests/logs
-    # ci.yml rewrites REVERB_HOST so the host-side CLI can reach the ws container
-    sed -i 's/REVERB_HOST=127.0.0.1/REVERB_HOST=localhost/' .env
     ok ".env prepared from .env.ci"
 }
 
@@ -213,16 +211,18 @@ stage_build() {
     go work sync
 
     info "go vet (explicit modules)"
-    go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... \
+    go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... \
            ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/...
 
     info "go build upsilonapi"
     go build -o /dev/null ./upsilonapi
     info "go build upsiloncli"
     go build -o /dev/null ./upsiloncli/cmd/upsiloncli
+    info "go build upsilonhub"
+    go build -o /dev/null ./upsilonhub/cmd/upsilonhub
 
     info "Dockerfile syntax checks"
-    docker build --check -f battleui/Dockerfile battleui/ 2>/dev/null || warn "battleui Dockerfile --check skipped"
+    docker build --check -f upsilonhub/Dockerfile . 2>/dev/null || warn "upsilonhub Dockerfile --check skipped"
     docker build --check -f upsilonapi/Dockerfile . 2>/dev/null     || warn "upsilonapi Dockerfile --check skipped"
 
     if [ -f tests/lint_report.sh ]; then
@@ -234,7 +234,7 @@ stage_build() {
 }
 
 # ----------------------------------------------------------------------------
-# STAGE 2 — Unit Tests (Go + PHP)
+# STAGE 2 — Unit Tests (Go)
 # ----------------------------------------------------------------------------
 stage_unit() {
     log "STAGE 2: Unit Tests"
@@ -242,8 +242,9 @@ stage_unit() {
 
     info "Go unit tests"
     go work sync
-    go test -count=1 -timeout 120s -json \
-        ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... \
+    # 600s: the hub feature tests boot throwaway Postgres containers.
+    go test -count=1 -timeout 600s -json \
+        ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... \
         ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... \
         > go-test-results.json 2>&1 || true
     if grep -q '"Action":"fail"' go-test-results.json; then
@@ -253,74 +254,6 @@ stage_unit() {
     fi
     ok "Go unit tests passed"
 
-    info "Building battleui-ci image for PHP tests"
-    docker build -t battleui-ci ./battleui
-
-    info "Building test image with dev dependencies"
-    # The production image is built --no-dev, so phpunit / `artisan test` are
-    # absent. We install dev deps now (at build time, on the default network where
-    # the internet works) into a derived image, so the test run itself needs no
-    # internet — it only talks to the ephemeral Postgres on an isolated network.
-    docker build -t battleui-citest - <<'DOCKERFILE'
-FROM battleui-ci
-RUN composer install --no-interaction --quiet
-DOCKERFILE
-
-    info "Running PHPUnit (PostgreSQL)"
-    # The migrations use Postgres-only DDL (ALTER TABLE ... ADD CONSTRAINT ... CHECK)
-    # so the tests must run on Postgres, not SQLite. We spin up an ephemeral
-    # postgres:18 on a dedicated network and point PHPUnit at it (DB_HOST override),
-    # so this does NOT depend on the dev-compose `db` host being present.
-    # We also inject APP_KEY (.env is excluded by .dockerignore) and bind-mount
-    # phpunit.xml (also .dockerignore'd). Detection asserts on the docker exit code
-    # AND a real PHPUnit summary so the step can never silently false-pass.
-    local app_key php_net="upsilon-phpunit-net" php_db="upsilon-phpunit-db" php_rc=0
-    app_key="$(grep -E '^APP_KEY=' .env.ci | head -1 | cut -d= -f2-)"
-
-    docker rm -f "$php_db" >/dev/null 2>&1 || true
-    docker network rm "$php_net" >/dev/null 2>&1 || true
-    docker network create "$php_net" >/dev/null
-    docker run -d --name "$php_db" --network "$php_net" \
-        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=testing \
-        postgres:18-alpine >/dev/null
-
-    info "Waiting for ephemeral postgres to be ready"
-    local tries=0
-    until docker exec "$php_db" pg_isready -U postgres >/dev/null 2>&1; do
-        tries=$((tries + 1))
-        if [ "$tries" -gt 30 ]; then
-            err "ephemeral postgres did not become ready"
-            docker rm -f "$php_db" >/dev/null 2>&1 || true
-            docker network rm "$php_net" >/dev/null 2>&1 || true
-            return 1
-        fi
-        sleep 1
-    done
-
-    docker run --rm --network "$php_net" \
-        -e APP_ENV=testing \
-        -e APP_KEY="$app_key" \
-        -e DB_CONNECTION=pgsql \
-        -e DB_HOST="$php_db" \
-        -e DB_PORT=5432 \
-        -e DB_DATABASE=testing \
-        -e DB_USERNAME=postgres \
-        -e DB_PASSWORD=postgres \
-        -v "$(pwd)/battleui/phpunit.xml:/var/www/html/phpunit.xml:ro" \
-        battleui-citest \
-        sh -c "php artisan test --exclude-group=engine-required 2>&1" \
-        | tee php-test-results.txt || php_rc=1
-
-    docker rm -f "$php_db" >/dev/null 2>&1 || true
-    docker network rm "$php_net" >/dev/null 2>&1 || true
-
-    if [ "$php_rc" -ne 0 ] \
-        || grep -qE "FAILED|Failed to open stream" php-test-results.txt \
-        || ! grep -qE "Tests:.*(passed|OK)|OK \(" php-test-results.txt; then
-        err "PHP tests FAILED"
-        return 1
-    fi
-    ok "PHP unit tests passed"
 
     if [ -f tests/unit_report.sh ]; then
         chmod +x tests/unit_report.sh
@@ -339,8 +272,8 @@ stage_integration() {
 
     # Playwright (host side) — optional/heavy
     if [ "$SKIP_PLAYWRIGHT" -eq 0 ] && command -v node >/dev/null 2>&1; then
-        info "Installing Playwright dependencies (battleui)"
-        ( cd battleui && npm install && npx playwright install --with-deps chromium ) \
+        info "Installing Playwright dependencies (upsilonbattleui)"
+        ( cd upsilonbattleui && npm ci && npx playwright install --with-deps chromium ) \
             || warn "Playwright install failed — UI tests will be skipped"
     else
         warn "Skipping Playwright install (--skip-playwright or node missing)"
@@ -350,9 +283,9 @@ stage_integration() {
     $COMPOSE up -d --wait --wait-timeout 300
     $COMPOSE ps
 
-    if [ "$SKIP_PLAYWRIGHT" -eq 0 ] && command -v node >/dev/null 2>&1 && [ -d battleui/node_modules ]; then
+    if [ "$SKIP_PLAYWRIGHT" -eq 0 ] && command -v node >/dev/null 2>&1 && [ -d upsilonbattleui/node_modules ]; then
         log "E2E: Playwright tests"
-        ( cd battleui && PLAYWRIGHT_SKIP_SERVER=1 npx playwright test ) || { warn "Playwright tests reported failures"; rc=1; }
+        ( cd upsilonbattleui && PLAYWRIGHT_BASE_URL=http://localhost:8085 npx playwright test --workers=1 ) || { warn "Playwright tests reported failures"; rc=1; }
     fi
 
     log "E2E: Centralized customer scenarios"
@@ -371,7 +304,7 @@ stage_integration() {
     if [ "$rc" -ne 0 ]; then
         warn "Collecting docker logs (failures detected)"
         mkdir -p ci_logs
-        for svc in app ws engine db tester; do
+        for svc in hub-migrate hub-seed hub proxy engine db tester; do
             $COMPOSE logs "$svc" > "ci_logs/$svc.log" 2>&1 || true
         done
         info "Service logs saved under $TARGET_DIR/ci_logs/"

@@ -136,9 +136,9 @@ run_e2e_test "e2e_item_grants_skill.js"
 # 5. Run Playwright Tests
 echo ""
 echo "--- Running Critical Playwright Tests ---"
-cd battleui
+cd upsilonbattleui
 if [ ! -d "node_modules" ]; then
-    echo "Installing battleui dependencies..."
+    echo "Installing upsilonbattleui dependencies..."
     npm install > /dev/null 2>&1
 fi
 
@@ -146,7 +146,7 @@ run_playwright() {
     local spec=$1
     echo -n "Running Playwright: $spec... "
     local start_time=$SECONDS
-    if PLAYWRIGHT_SKIP_SERVER=1 npx playwright test "tests/playwright/$spec" > playwright_last_run.log 2>&1; then
+    if npx playwright test --workers=1 "tests/playwright/$spec" > playwright_last_run.log 2>&1; then
         local duration=$((SECONDS - start_time))
         echo -e "\033[32m[PASSED]\033[0m in ${duration}s"
         PASSED_COUNT=$((PASSED_COUNT + 1))
@@ -155,7 +155,7 @@ run_playwright() {
         echo -e "\033[31m[FAILED]\033[0m in ${duration}s"
         FAILED_COUNT=$((FAILED_COUNT + 1))
         FAILED_TESTS="$FAILED_TESTS $spec"
-        echo "    (Check battleui/playwright_last_run.log for details)"
+        echo "    (Check upsilonbattleui/playwright_last_run.log for details)"
     fi
 }
 

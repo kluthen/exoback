@@ -45,26 +45,12 @@ generate_secret() {
     base64 < /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32
 }
 
-# Function to generate a Laravel APP_KEY (32 random bytes, base64 encoded)
-generate_app_key() {
-    echo "base64:$(head -c 32 /dev/urandom | base64)"
-}
-
 echo "[+] Generating secure secrets..."
 
-# Generate App Key
-APP_KEY=$(generate_app_key)
+# Admin seed password (hub -seed admin block)
+ADMIN_INITIAL_PASSWORD=$(generate_secret)
 # Use ^ to anchor the replacement to the start of the key name to avoid substring collision
-sed -i "s|^APP_KEY=GENERATED_SECRET|APP_KEY=$APP_KEY|g" "$ENV_FILE"
-
-# Generate Reverb IDs
-REVERB_APP_ID=$(generate_secret)
-REVERB_APP_KEY=$(generate_secret)
-REVERB_APP_SECRET=$(generate_secret)
-
-sed -i "s|^REVERB_APP_ID=GENERATED_SECRET|REVERB_APP_ID=$REVERB_APP_ID|g" "$ENV_FILE"
-sed -i "s|^REVERB_APP_KEY=GENERATED_SECRET|REVERB_APP_KEY=$REVERB_APP_KEY|g" "$ENV_FILE"
-sed -i "s|^REVERB_APP_SECRET=GENERATED_SECRET|REVERB_APP_SECRET=$REVERB_APP_SECRET|g" "$ENV_FILE"
+sed -i "s|^ADMIN_INITIAL_PASSWORD=GENERATED_SECRET|ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD|g" "$ENV_FILE"
 
 echo "---------------------------------------"
 echo "[OK] Production environment initialized."

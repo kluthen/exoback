@@ -9,9 +9,9 @@ The Upsilon system is orchestrated using Docker Compose (Project Name: `upsilon-
 | Service | Responsibility | Healthcheck |
 |---|---|---|
 | `db` | PostgreSQL 18 database for all system state. | `pg_isready` |
-| `db-init` | Lifecycle service that runs migrations on startup. | (One-shot) |
-| `app` | Laravel 11 / Vue.js 3 frontend and REST API. | `http://localhost/up` |
-| `ws` | Laravel Reverb WebSocket server for real-time battle updates. | `http://localhost:8080` |
+| `db-init` | Hub image running `-migrate-mode baseline` on startup (adopts a Laravel-migrated schema, applies newer migrations). | (One-shot) |
+| `hub` | Go platform gateway serving the REST API, the SSE realtime stream and the SPA on `:8090`. | (via `proxy`) |
+| `proxy` | Caddy front door; publishes the client port and gates the stack on `:8085/up`. | `wget :8085/up` |
 | `engine` | Go-based battle engine for damage computation and logic. | `http://localhost:8081/health` |
 | `cli` | Interactive CLI runner for debug and administrative tasks. | (Active) |
 
@@ -20,13 +20,8 @@ The Upsilon system is orchestrated using Docker Compose (Project Name: `upsilon-
 To ensure security and consistency, the stack uses a root-level `.env` file generated from `env.example`.
 
 ### Automatic Generation
-The `scripts/setup_prod.sh` script automates the following requirements:
-1. **Consistency**: It ensures `REVERB_APP_KEY` is the same in `app` and `ws`, and that `VITE_REVERB_APP_KEY` matches for the frontend build.
-2. **Entropy**: It generates high-entropy random strings for:
-   - `APP_KEY` (AES-256 encryption key)
-   - `REVERB_APP_ID`
-   - `REVERB_APP_KEY`
-   - `REVERB_APP_SECRET`
+The `scripts/setup_prod.sh` script generates a high-entropy value for:
+- `ADMIN_INITIAL_PASSWORD` (gates the admin block of `hub -seed`)
 
 ### Propagation
 All services share the `.env` file via the `env_file` directive in `docker-compose.prod.yaml`. This avoids duplicating secret definitions across the YAML file.
@@ -49,9 +44,7 @@ The stack is designed for **Persistence-First** operation:
 ### Port Mapping
 | Host Port | Service Port | Scope |
 |---|---|---|
-| `5434` | `5432` | Postgres (Alternate to avoid host conflict) |
-| `8000` | `80` | Laravel App / WebUI |
-| `8080` | `8080` | WebSocket Server |
+| `8000` | `8085` | Caddy front door → hub (WebUI + API + SSE) |
 | `8081` | `8081` | Go Engine |
 
 ## 4. CLI Usage & Scripting
@@ -61,7 +54,7 @@ The `cli` service provides a headless environment for executing automation scrip
 ### Basic CLI Commands
 From the project root on the host, you can interact with the containerized CLI:
 
-*   **System Status**: Verify reachability of Laravel API, Go Engine, and WebSockets.
+*   **System Status**: Verify reachability of the hub (API + SSE) and Go Engine.
     ```bash
     docker compose -f docker-compose.prod.yaml exec cli upsiloncli status
     ```
@@ -139,19 +132,21 @@ docker compose -f docker-compose.prod.yaml exec cli upsiloncli --farm samples/pv
 
 
 ## 6. Administrative Setup (Seeding)
-To establish the initial system administrator, you must define a password and run the database seeder.
+To establish the initial system administrator, you must define a password and run the hub seeder (one-shot container on the prod network):
 
 ```bash
-docker compose -f docker-compose.prod.yaml exec -e ADMIN_INITIAL_PASSWORD="your_secure_password" app php artisan db:seed
+docker compose -f docker-compose.prod.yaml run --rm \
+  -e ADMIN_INITIAL_PASSWORD="your_secure_password" db-init -seed
 ```
-This will create a default administrator at `admin@admin.com` with the `Admin` role.
+This will create a default administrator at `admin@admin.com` with the `Admin` role (plus the seeded catalog and test accounts).
 ## 7. Troubleshooting
 
 ### Clearing Stuck Matches
 If you find yourself stuck in a match that no longer exists or if the system state becomes inconsistent, you can clear all active matches and participants without resetting the entire database:
 
 ```bash
-docker compose -f docker-compose.prod.yaml exec app php artisan tinker --execute="DB::statement('TRUNCATE table game_matches CASCADE'); DB::statement('TRUNCATE table match_participants CASCADE');"
+docker compose -f docker-compose.prod.yaml exec db \
+  psql -U postgres -d upsilon -c "TRUNCATE table game_matches CASCADE; TRUNCATE table match_participants CASCADE; TRUNCATE table matchmaking_queues;"
 ```
 
 > [!WARNING]

@@ -63,17 +63,16 @@ start_service() {
 }
 
 
-# 1. Laravel API
-start_service "Laravel API" "battleui" "php artisan serve --host=0.0.0.0 --port=8000" "laravel.log" 8000
-
-# 2. Reverb Server
-start_service "Reverb Server" "battleui" "php artisan reverb:start" "reverb.log" 8080
-
-# 3. Vue Frontend
-start_service "Vue Frontend" "battleui" "npm run dev" "vite.log" 5173
-
-# 4. Upsilon Engine (Go)
+# 1. Upsilon Engine (Go) — before the hub so its client finds it at boot
 start_service "Upsilon Engine" "upsilonapi" "./bin/upsilonapi" "engine.log" 8081
+
+# 2. Upsilon Hub (API + SSE + SPA). DATABASE_URL comes from the devcontainer
+# env; APP_DEBUG=true is required for the '-- DEBUG MODE -- ' exception-prefix
+# parity the CLI edge suites assert.
+start_service "Upsilon Hub" "upsilonhub" "env APP_DEBUG=true UPSILON_API_URL=http://localhost:8081 HUB_SPA_DIR=/workspace/upsilonbattleui/dist ./bin/upsilonhub" "hub.log" 8090
+
+# 3. Vue Frontend (Vite dev server, proxies /api + /up to the :8085 front door)
+start_service "Vue Frontend" "upsilonbattleui" "npm run dev" "vite.log" 5173
 
 echo "---------------------------------------"
 echo "All services are running and verified."

@@ -3,7 +3,7 @@ cd "$(dirname "$0")/.."
 
 # Configuration
 PID_FILE=".services.pids"
-PORTS=(8000 8080 5173 8081)
+PORTS=(8090 5173 8081)
 
 echo "---------------------------------------"
 echo "Stopping Upsilon Stack..."

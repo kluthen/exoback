@@ -1,13 +1,13 @@
 # Upsilon Battle: API Communication Reference
 
-This document provides a comprehensive reference for the communication interfaces between the Vue.js frontend, the Laravel API Gateway, and the Upsilon (Go) Battle Engine.
+This document provides a comprehensive reference for the communication interfaces between the Vue.js frontend (`upsilonbattleui`), the Upsilon Hub (Go platform gateway), and the Upsilon (Go) Battle Engine.
 
 ## 1. Shared Infrastructure
 
 ### 1.1 Standard JSON Message Envelope
 **Source:** [[api_standard_envelope]]
 
-To guarantee traceability and consistent error handling, every JSON exchange between system units (Vue, Laravel, Go) MUST conform to the following root structure:
+To guarantee traceability and consistent error handling, every JSON exchange between system units (Vue, Hub, Engine) MUST conform to the following root structure:
 
 - **Event Name:** `board.updated`
 - **Payload:** Strictly follows the `[[api_standard_envelope]]` format. The tactical state is located in the `data` field of the envelope. Team-based victory is reported via `winner_team_id`. The state includes an optional `action` object providing explicit data for animations (moves, attacks, passes).
@@ -32,7 +32,7 @@ To guarantee traceability and consistent error handling, every JSON exchange bet
 ### 1.2 Request Identification
 **Source:** [[api_request_id]]
 
-The `request_id` must be a **string (UUIDv7)**. It is the responsibility of the originator (typically the Vue frontend for user actions) to generate this ID. It must be propagated across all distributed calls spanning Laravel and Go to maintain the trace defined in [[rule_tracing_logging]].
+The `request_id` must be a **string (UUIDv7)**. It is the responsibility of the originator (typically the Vue frontend for user actions) to generate this ID. It must be propagated across all distributed calls spanning the hub and the engine to maintain the trace defined in [[rule_tracing_logging]].
 
 ### 1.3 State Versioning & Deduplication
 **Source:** [[mech_game_state_versioning]]
@@ -41,26 +41,27 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 1. **Versioning:** Every state mutation in the Go Engine increments a `Version` (int64).
 2. **De-duplication:** The Go Internal Engine drops outgoing webhooks if the state hasn't progressed since the last transmission.
-3. **Gateway Enforcement:** Laravel ignores incoming webhooks with a version lower than or equal to the current database state, effectively deduplicating the fan-out from multiple controllers. Laravel uses the `version` (int64) as the single source of truth for match progression, mapping it to both `version` and legacy `turn` columns.
+3. **Gateway Enforcement:** the hub ignores incoming webhooks with a version lower than or equal to the current database state, effectively deduplicating the fan-out. The hub uses the `version` (int64) as the single source of truth for match progression, mapping it to both `version` and legacy `turn` columns.
 4. **Broadcast Efficiency:** Clients (Vue/CLI) rely on the `version` field to ensure they are processing the latest tactical state.
 
 ### 1.4 Service Ports & Network Topology
 
 | Service | Port (Dev) | Protocol | Role |
 | :--- | :--- | :--- | :--- |
-| **Laravel API** | `8000` | HTTP | External Gateway & Orchestration |
-| **Reverb Server** | `8080` | WS/WSS | Tactical WebSocket Bridge |
-| **Vue.js (Vite)** | `5173` | HTTP | "Neon in the Dust" Frontend (Dev Only) |
+| **Caddy Front Door** | `8085` | HTTP | Stable client entrypoint → hub |
+| **Upsilon Hub** | `8090` | HTTP | External Gateway, SSE stream & SPA serving |
+| **Go Engine** | `8081` | HTTP | Battle computation (internal) |
+| **Vue.js (Vite)** | `5173` | HTTP | "Neon in the Dust" Frontend (Dev Only, proxies `/api` to `:8085`) |
 
 > [!TIP]
-> **Production Note:** In production, the Vue.js app is pre-built and served directly by the Laravel API at the same port as the web server, eliminating the need for the Vite dev server (Port 5173).
+> **Production Note:** In production, the Vue.js app is pre-built into the hub image (`HUB_SPA_DIR`) and served by the hub behind the front door, eliminating the need for the Vite dev server (Port 5173).
 
 ---
 
-## 2. Laravel API (External Gateway)
+## 2. Upsilon Hub (External Gateway)
 **Source Module:** [[api_laravel_gateway]]  
-**Base URL:** `http://localhost:8000/api/v1`  
-**Authentication:** Bearer Token (Laravel Sanctum)
+**Base URL:** `http://localhost:8085/api/v1` (front door; hub-direct on `:8090`)  
+**Authentication:** Bearer Token (opaque personal access tokens, Sanctum-compatible rows; sliding renewal per [[upsilonbattle:mech_sanctum_token_renewal]])
 
 ### 2.0 API Summary
 
@@ -95,8 +96,7 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 | `DELETE` | `/admin/users/{account_name}` | Administrative Soft Delete | [[uc_admin_user_management]] |
 | `GET` | `/admin/history` | List All Match History (Cursor Based) | [[uc_admin_history_management]] |
 | `DELETE` | `/admin/history/purge` | Clean up match history older than 90 days | [[uc_admin_history_management]] |
-| `GET` | `/events` | Realtime SSE Stream (replaces WS for the SPA, §2.8) | [[api_websocket_game_events]] |
-| `POST` | `/broadcasting/auth` | WebSocket Channel Authorization (legacy Reverb, until cutover) | [[api_websocket]] |
+| `GET` | `/events` | Realtime SSE Stream (§2.8) | [[api_websocket_game_events]] |
 | `POST` | `/api/webhook/upsilon` | Ingest Engine State Update (Internal) | [[api_go_webhook_callback]] |
 | `GET` | `/admin/shop-items` | List All Shop Items (Admin) | [[api_shop_item_admin_crud]] |
 | `POST` | `/admin/shop-items` | Create New Shop Item (Admin) | [[api_shop_item_admin_crud]] |
@@ -152,7 +152,7 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 #### `POST /auth/logout`
 - **Specification:** [[api_auth_logout]]
 - **Intent:** [[uc_auth_logout]]: Terminate the active session for Player or Admin and revoke the current access token.
-- **Security:** Requires `auth:sanctum` middleware.
+- **Security:** Requires bearer authentication.
 - **Output:** `null` (successful status code 200 with standard success envelope).
 
 #### `POST /auth/update`
@@ -187,9 +187,7 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.2 Profile & Character Management
 
-> Served by the Go hub since migration Phase 5 (the proxy routes
-> `/api/v1/profile` and `/api/v1/profile/*` to `:8090`). Contracts below
-> are unchanged.
+> Contracts unchanged from the Laravel gateway (ported at migration Phase 5).
 
 #### `GET /profile`
 - **Specification:** [[customer_player_profile]]
@@ -249,10 +247,8 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.3 Matchmaking & Queue
 
-> Served by the Go hub since migration Phase 4 (the proxy routes
-> `/api/v1/matchmaking/*` and `/api/v1/match/stats/*` to `:8090`). Contracts
-> below are unchanged; `match.found` now reaches the SPA over the SSE stream
-> (§2.8).
+> Contracts unchanged from the Laravel gateway (ported at migration Phase 4);
+> `match.found` reaches the SPA over the SSE stream (§2.8).
 
 #### `POST /matchmaking/join`
 - **Specification:** [[api_matchmaking]]
@@ -288,7 +284,7 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 #### `GET /game/{id}`
 - **Specification:** [[api_battle_proxy]]
-- **Intent:** Retrieve the **cached** board state from the Laravel database.
+- **Intent:** Retrieve the **cached** board state from the hub's database.
 - **Logic:** Avoids direct engine overhead by reading the last known state synced via webhook.
 - **Input:**
   - `id`: `string (UUID)` (URL Parameter - Match ID)
@@ -298,8 +294,8 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 - **Intent:** [[uc_combat_turn]]: Proxy tactical commands to the Upsilon Go Engine.
 - **Input:**
   - `id`: `string (UUID)` (URL Parameter - Match ID)
-  - `payload`: `ArenaActionRequest` (Note: `player_id` is automatically injected and validated by Laravel)
-- **Logic:** Validates that the authenticated user owns the targeted `entity_id` before proxying the request to Upsilon `/internal/arena/:id/action` via [[api_go_battle_action]]. Includes `skill_id` for 'skill' actions.
+  - `payload`: `ArenaActionRequest` (Note: `player_id` is automatically injected and validated by the hub)
+- **Logic:** Validates that the authenticated user owns the targeted `entity_id` before proxying the request to the engine via [[api_go_battle_action]]. Includes `skill_id` for 'skill' actions.
 - **Output:** `ArenaActionResponse` (See [[#4.1-arenaactionrequest]])
 
 #### `POST /game/{id}/forfeit`
@@ -313,8 +309,6 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.5 Shop, Inventory & Equipment (ISS-074)
 
-> Served by the Go hub since migration Phase 5 (`/api/v1/shop/*`,
-> `/api/v1/profile/inventory` and the equipment routes go to `:8090`).
 > Every credit/wallet/market mutation runs through the hub's economy
 > seam (ledger + wallet in one transaction).
 
@@ -356,9 +350,8 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.6 Social & Competitive
 
-> Served by the Go hub since migration Phase 5 (`/api/v1/leaderboard`
-> goes to `:8090`). The hand-built envelope (no top-level `meta`) is
-> preserved.
+> The hand-built envelope (no top-level `meta`) is preserved from the
+> Laravel implementation.
 
 #### `GET /leaderboard`
 - **Specification:** [[api_leaderboard]]
@@ -376,10 +369,8 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.7 Administrative Management
 
-> Served by the Go hub since migration Phase 5 (`/api/v1/admin/*` goes to
-> `:8090`) as facet-shaped API endpoints (locked no-Inertia decision —
-> future `/admin/v1`). The Inertia admin *pages* stay on Laravel until
-> Phase 6; their data already comes from these endpoints.
+> Facet-shaped API endpoints (locked no-Inertia decision — future
+> `/admin/v1`). The SPA's admin pages consume these endpoints directly.
 
 #### `GET /admin/dashboard`
 - **Specification:** [[ui_admin_dashboard]]
@@ -446,9 +437,6 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.10 Admin Catalog Management (ISS-086)
 
-> Served by the Go hub since migration Phase 5 (routes under
-> `/api/v1/admin/*`).
-
 #### `GET /admin/shop-items`
 - **Specification:** [[api_shop_item_admin_crud]]
 - **Intent:** List all items, including those marked as unavailable.
@@ -487,15 +475,15 @@ To ensure consistency and optimize performance during high-frequency combat, Ups
 
 ### 2.8 Realtime Stream (SSE)
 
-Real-time updates ride **Server-Sent Events** from the Go hub (migration doc 03, Phase 3).
-The stream replaces the Laravel Reverb/Pusher websocket for the SPA; Reverb stays running
-side-by-side (legacy emitters, rollback) until the Phase 6 cutover.
+Real-time updates ride **Server-Sent Events** from the hub (migration doc 03, Phase 3).
+The stream replaced the Laravel Reverb/Pusher websocket; the WebSocket tier is
+decommissioned since the Phase 6 cutover.
 
 #### `GET /api/v1/events`
 - **Specification:** [[api_websocket_game_events]]
 - **Intent:** One authenticated stream per user carrying all private realtime events
-  (the connection *is* the former `private-user.{ws_channel_key}` channel — no
-  `/broadcasting/auth` handshake, no channel key).
+  (the connection *is* the user's private channel — no channel-auth handshake,
+  no channel key).
 - **Authentication:** `Authorization: Bearer {token}` — like any API call. Sliding token
   renewal does not ride the stream; tokens renew on regular REST traffic.
 - **Input (headers):**
@@ -516,12 +504,6 @@ side-by-side (legacy emitters, rollback) until the Phase 6 cutover.
 - `turn.started`: New entity initiative active (starts 30s clock).
 - `board.updated`: Position change, stat change, or successful tactical action (Move, Attack, Pass).
 - `game.ended`: Win condition met or match terminated.
-
-#### Legacy WebSocket (Reverb, until Phase 6 cutover)
-- **Handshake URL:** `ws://127.0.0.1:8080/app/{REVERB_APP_KEY}?protocol=7&client=js&version=8.4.0-rc2&flash=false`
-- **Channel auth:** `POST /broadcasting/auth` ([[api_websocket]]) with `socket_id` +
-  `channel_name` (`private-user.{ws_channel_key}`); returns `{ "auth": "key:signature" }`.
-- The SPA no longer connects to it; `ws_channel_key` rotation persists for interop until cutover.
 
 ### 2.9 Advanced Identity Management
 
@@ -599,7 +581,7 @@ This section documents internal-facing interfaces that are **NOT** reachable fro
 - **Output:** `SkillGenerateResponse` (JSON)
 
 ### 3.2 Asynchronous Webhook (Callback)
-**Destination:** `POST /api/webhook/upsilon` (on Laravel Gateway) — Must be reachable internally from the Go Engine.
+**Destination:** `POST /api/webhook/upsilon` (on the hub, via the front door) — Must be reachable internally from the Go Engine.
 
 #### Webhook Event Payload
 - **Specification:** [[api_go_webhook_callback]]
@@ -759,7 +741,6 @@ Detailed state of a single actor.
 | :--- | :--- | :--- |
 | `account_name` | `string` | Displayed name. |
 | `role` | `string` | User's role (e.g., 'Player', 'Admin'). |
-| `ws_channel_key`| `string (UUID)` | Pseudonym for secure WebSocket private channel subscription. |
 | `email` | `string` | User's email address. |
 | `full_address` | `string` | User's residential address. |
 | `birth_date` | `string (ISO8601)` | User's date of birth. |
@@ -801,7 +782,7 @@ Payload for the asynchronous engine callback.
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `match_id` | `string (UUID)` | The Laravel Match ID. |
+| `match_id` | `string (UUID)` | The platform Match ID. |
 | `event_type` | `string` | e.g., `game.started`, `turn.started`. |
 | `player_id` | `string (UUID)` | Optional: Targeted player. |
 | `entity_id` | `string (UUID)` | Optional: Targeted entity. |

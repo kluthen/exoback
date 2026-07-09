@@ -2,7 +2,7 @@
 set -e
 
 # Target directories
-DIRS="upsilonapi upsilonbattle battleui upsiloncli"
+DIRS="upsilonapi upsilonbattle upsilonbattleui upsiloncli"
 
 # Function to move atoms for a specific project
 move_atoms() {
@@ -32,8 +32,8 @@ for project in $DIRS; do
     move_atoms $project
 done
 
-# Move shared atoms to battleui (as requested by user)
-echo "Moving shared atoms to battleui..."
+# Move shared atoms to upsilonbattleui (as requested by user)
+echo "Moving shared atoms to upsilonbattleui..."
 cat << 'EOF' > /tmp/shared_atoms.txt
 req_security
 req_matchmaking
@@ -46,7 +46,7 @@ EOF
 
 # Since these are prefixes or exact names in the shared atoms list, let's just move them by prefix
 for prefix in $(cat /tmp/shared_atoms.txt); do
-    mv docs/${prefix}*.atom.md battleui/docs/ 2>/dev/null || true
+    mv docs/${prefix}*.atom.md upsilonbattleui/docs/ 2>/dev/null || true
 done
 
 # Move temp atoms to docs/trashed

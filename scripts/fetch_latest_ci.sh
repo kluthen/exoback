@@ -65,15 +65,6 @@ for line in sys.stdin:
     fi
 fi
 
-PHP_RESULTS="$WORKDIR/php-test-results/php-test-results.txt"
-if [ -f "$PHP_RESULTS" ] && grep -q "FAILED" "$PHP_RESULTS"; then
-    echo
-    echo "=================================================="
-    echo "PHP test failures"
-    echo "=================================================="
-    grep -A5 "FAILED" "$PHP_RESULTS"
-fi
-
 CI_LOGS="$WORKDIR/integration-test-results/ci_logs"
 if [ -d "$CI_LOGS" ]; then
     echo
