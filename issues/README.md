@@ -10,6 +10,10 @@
 
 | Ref | File | Severity | Status | Summary |
 |---|---|---|---|---|
+| ISS-105 | [ISS-105_20260709_cli_token_starvation_long_fights.md](ISS-105_20260709_cli_token_starvation_long_fights.md) | Low | Open | CLI scenarios idling > 15 min between requests 401 mid-fight (sliding renewal never engages; Sanctum never expired) — flakes `e2e_archetype_pve_full_fight` on long fights |
+| ISS-104 | [ISS-104_20260708_matchmaking_parallel_join_queue_poison.md](ISS-104_20260708_matchmaking_parallel_join_queue_poison.md) | High | Open | Parallel matchmaking joins can strand a queue entry; the strand self-perpetuates, pairing every later 1v1_PVE joiner with the previous victim's match (403 on game state) |
+| ISS-103 | [ISS-103_20260707_privacy_check_asserts_unimplemented_masking.md](ISS-103_20260707_privacy_check_asserts_unimplemented_masking.md) | Medium | Open | e2e_battle_starts_privacy_check asserts foe-loadout masking neither Laravel nor the hub ever implemented (ISS-077 contract) |
+| ISS-102 | [ISS-102_20260707_forfeit_before_engine_start_window.md](ISS-102_20260707_forfeit_before_engine_start_window.md) | Medium | Open | Forfeit 400s (game.not.in.progress) in the engine's startup window right after match.found; hidden by Reverb latency, exposed by SSE |
 | ISS-100 | [ISS-100_20260616_devcontainer_webgl_playwright_visual.md](ISS-100_20260616_devcontainer_webgl_playwright_visual.md) | Medium | Open | Devcontainer lost WebGL/SwiftShader; Playwright 3D visual specs can't render (env regression) |
 | ISS-090 | [ISS-090_20260427_action_endpoint_segregation.md](ISS-090_20260427_action_endpoint_segregation.md) | Medium | Open | All tactical actions funneled through one endpoint; needs segregation |
 | ISS-089 | [ISS-089_20260426_mechanic_random_shop_algorithm.md](ISS-089_20260426_mechanic_random_shop_algorithm.md) | Medium | Open | Deterministic daily rotating shop algorithm |

@@ -62,6 +62,7 @@ Vue SPA stays in battleui until Phase 3+ (deferred from §14's "initially"). Pha
 | 3 — Realtime (SSE) | **DONE 2026-07-05** | `GET /api/v1/events` (RequireAuth only — sliding renewal rides REST envelopes, never the stream): the bearer-authenticated stream *is* the user's private channel. **`ws_channel_key` decision (doc 03): retired from the transport**; login keeps rotating it for Laravel interop until Phase 6, column removal then. `internal/gateway/sse` broadcaster subscribes to the bus, masks per recipient (`battle.MaskBoardState`, participants only, exactly the PHP broadcast loop), frame = `id: {match}:{version}`, `event:` = engine event type passthrough, `data:` = the `BoardUpdated::broadcastWith` envelope (`message: "Board Updated"`, uuid7 request_id, `data.match_id` + masked state, empty meta). Heartbeat comment ~25s (`Deps.SSEHeartbeat` shortens it in tests); slow consumers dropped at a 32-frame buffer (reconnect + replay self-heals); broadcaster closed before `server.Shutdown` so streams drain. `Last-Event-ID` replay = current-snapshot-if-newer, participant-gated, named after `_atd_meta.last_event_type`. SPA: `laravel-echo`/`pusher-js`/`@laravel/echo-vue` **removed**; `services/sse.js` is a fetch-based SSE client behind an Echo-compatible facade — fetch, not native `EventSource`, because sliding renewal retires the old token ~20s after renewal, so a URL-frozen token dies mid-session; every reconnect re-reads localStorage and sends `Last-Event-ID`. Composables/components untouched (facade keeps `.private().listen/.subscribed/.error`, `.leave`, and the pusher-shaped `connector.pusher.connection` health object). Caddy routes `/api/v1/events` → hub with `flush_interval -1` (config validated). communication.md §2.8 rewritten + endpoint table + Postman entry added. 6 SSE feature tests over a real httptest server (masked fan-out to 2 recipients, envelope shape, non-participant silence, replay, replay authz, malformed-id degrade, 401) + full suite green; SPA `npm run build` green. |
 | 4 — Matchmaking | **DONE 2026-07-05** | All `MatchMakingController` endpoints (`matchmaking/join\|status\|leave`, `match/stats/waiting\|active`) behind a `battle.Matchmaker` domain object; **match creation is its own operation** (`CreateMatch`: participants + teams + context → running arena) that queue processing calls, queue identity carries `QueueScope` (kickoff rule 4). PHP-parity AI generation (name patterns, archetypes ≤1 support/≤1 sneak, `total_wins` grading) and team split — including the PHP quirk that 2v2_PVE seats human #2 on team 2 beside both AIs (ported as-is). Engine start payload = `UpsilonPlayerResource` parity: new `CharacterService.BattleLoadouts` resolves equipment (armor→utility→weapon UNION over the 3 slot columns) + inventory skills + D11 item-derived skills. Engine client gains StartArena/ArenaExists/ResurrectArena/ActiveMatchStats. **ISS-054 resurrection is live, with two deliberate PHP divergences:** (1) `serializer_version` is forwarded from the cached blob — PHP never sent it, so the engine's schema guard (bridge_resurrect.go) refused *every* Laravel resurrection; (2) an engine envelope with `success=false` counts as a failed resurrection → match concluded (PHP fell through to "matched" pointing the player at an arena never rebuilt). `match.found` now rides the SSE stream (bus event `battle.MatchFound` with explicit recipients — user-targeted, no masking, **no `id:` line**, nothing to replay; SPA facade needed zero changes) — old caveat (e) resolved. Hub reads `UPSILON_WEBHOOK_URL` (default = proxy front door) as the callback for arenas it starts. Proxy routes `/api/v1/matchmaking/*` + `/api/v1/match/stats/*` → hub (Caddyfile validated; restart the `proxy` container). 14 PHP tests (Matchmaking/ExtraMatchmaking/PVEMatchmaking/MatchVerification) re-expressed + extras (409 conflicts, loadout payload, SSE `match.found`, 4-test resurrection suite); token-renewal suite now drives `/matchmaking/status` per its original note; full suite green. communication.md §2.3 + §2.8 updated. |
 | 5 — Economy/loadout + admin | **DONE 2026-07-06** | All remaining player + admin endpoints ported thin. **Profile/characters:** `profile\|credits\|characters\|character/{id}` + reroll/upgrade/rename/delete over `CharacterService` (+`IdentityService.IncrementRerollCount` — users-table writes stay behind the seam); CP-cap/negative-check wording byte-parity; policy denials verbatim (`You do not own this character.`, `Reroll limit reached.`). **Shop/inventory:** `EconomyService` grew the market/inventory surface (catalog, `Purchase` = wallet-lock → guards → debit → upsert → both audit ledgers in one tx, `int64`; `PurchaseError` carries the PHP message/status/reason). **Equipment:** 3-slot ops live in `CharacterService` (gameplay tables); the inventory ownership check is an explicit `EconomyService.GetInventoryItem` call — the designed Phase 8 hub→economy seam (doc 02 §5 wrinkle). Cross-character mutual exclusivity in one tx. **Skills:** templates browse + per-character inventory (roll/equip/unequip, slot cap under row locks); `battle.Content` is the skill-template registry (admin CRUD); engine roll via `Engine.GenerateSkill` — the one **raw-body** engine call (no envelope), 5 s timeout, non-2xx = `ErrGeneratorUnavailable` (PHP bridge parity: unavailable/unreachable/invalid-response 503s). **Leaderboard:** hand-built envelope preserved (no top-level `meta` — renewal never patches it, like PHP), Sunday-00:01-UTC cycle, wins→score→id-desc ranking, PHP division semantics (int when even). **Admin:** users/anonymize/destroy (self-protection ISS-093, last-admin guard incl. the trashed-target case), history/purge (ISS-051/053 cursor pages), shop-items + skill-templates CRUD as facet-shaped endpoints behind `middleware.RequireAdmin` (no Inertia — locked). Admin anonymize deliberately does **not** revoke tokens (PHP parity; soft-deleted owner locks them out anyway). PHP tests re-expressed: CharacterTest, CharacterUpgradeTest, SkillTest (all 15), LeaderboardTest, AdminSelfProtectionTest + shop/inventory/equipment/CRUD extras (~50 new tests); full suite green. Proxy routes `/api/v1/{profile,profile/*,shop/*,skills/*,leaderboard,admin/*}` → hub (Caddyfile validated). Dangling PHP spec-links re-anchored per doc 05: `api_skill_generate_engine`→`[[upsilonapi:api_skill_generation]]`, `mech_character_reroll_{limit,effect}`→`[[upsilonbattle:mech_character_reroll]]`, `rule_admin_content_authority` dropped (no such atom). `/api/v1/help` stays on Laravel (CodeDiscoveryService introspects PHP source — Phase 6 decides its fate). |
+| 6 — Cutover & decommission | **IN PROGRESS 2026-07-07** — sub-phases A, B, D done; C then E remain (plan: doc 07) | **A (E2E gates through `:8085`): done.** Playwright 53/62 (failures = stale visual baselines + one pre-existing arena race, reproduced against Laravel-direct); upsiloncli e2e 33/38 + edge 53/55, every remaining failure attributed and filed (ISS-102 forfeit-in-startup-window exposed by SSE latency, ISS-103 privacy scenario asserts never-implemented masking, gameplay-randomness flakes). Gates caught and fixed two hub parity bugs: `filterValidateInt` (Laravel `integer` accepts numeric strings) and **APP_DEBUG exception-prefix parity** (`respond.ExceptionError`; **dev/CI must run the hub with `APP_DEBUG=true`**). A4 resurrection drill green **after an engine fix** — upsilonapi's `HandleArenaResurrect` bound the bare struct instead of the Standard Envelope, so live ISS-054 resurrection had never worked from either stack (envelope binding fixed, deployed, drill verified through the proxy). A5 live `skills/generate` verified. **B (hub self-sufficiency): done.** `-migrate-mode full\|baseline\|river-only` (`database.Baseline` stamps a Laravel-migrated DB at 000001), `internal/seed` ports the four Laravel seeders (`-seed`, `-seed-leaderboard`; deterministic catalog UUIDs, upsert semantics, admin block gated on `ADMIN_INITIAL_PASSWORD`), static SPA serving behind `HUB_SPA_DIR` (index.html fallback, enveloped `/api` 404 kept), `upsilonhub/Dockerfile` (umbrella-root context like the engine's, distroless nonroot, one image serve/migrate/seed — smoke-tested migrate+seed+login on a throwaway DB). **D (upsiloncli transport + `/help` retirement): done.** `internal/ws/listener.go` rewritten as an SSE client on `GET /api/v1/events` (bearer auth, Last-Event-ID replay, backoff; `REVERB_*` env + gorilla/websocket dropped; scripting API untouched); `/help` retired — `HelpEndpoint` removed (registry was already static), `e2e_api_discovery.js` deleted (suite now 37), REPL `status` pings `GET /up`. Caveat (b) cleared. Nothing committed yet in any repo. |
 
 Open caveats: (a) ATD MCP server was restarted (workspace cache now post-restructure), but
 `atd_check`/`atd_test_links` scoped to `upsilonhub` still do not attribute *prefixed*
@@ -71,14 +72,11 @@ link-resolution concern stands. Phases 1–2 links validated mechanically instea
 live in `upsilonapi`/`upsilonbattle`/`upsilontypes`/`shared`, *not* in `battleui/docs` — battleui's
 own corpus is frontend-only). Two PHP spec-links were dangling and are re-anchored/dropped in Go:
 `uc_player_registration_generate_characters` → `[[shared:uc_player_registration]]`,
-`entity_character_allocate_hp` → dropped (no such atom anywhere). (b) Playwright/upsiloncli gates
-still pending: they need the full dev stack up and clients pointed at the `:8085` proxy front door
-(only the DB container was running when Phase 1 landed); the backlog now includes the Phase 3 SSE
-E2E check (arena receives `board.updated` through the proxy), the Phase 4 checks (queue → match
-→ `match.found` on the stream through the proxy; a real ISS-054 kill-the-engine-mid-match
-resurrection) and the Phase 5 checks (shop → equip → arena loadout through the proxy; a real
-engine `skills/generate` roll — the fake only pins the contract); restart the `proxy` container
-to pick up the Caddyfile changes (Phase 5 added routes). (c) Local umbrella dir is still
+`entity_character_allocate_hp` → dropped (no such atom anywhere). (b) **Resolved at Phase 6 sub-phase A (2026-07-07)** — full stack behind `:8085`, Playwright +
+both upsiloncli suites run, all backlogged checks covered (SSE `board.updated`, queue →
+`match.found`, live ISS-054 resurrection drill, shop → equip → loadout, real `skills/generate`);
+remaining reds attributed to pre-existing issues (ISS-102/ISS-103) or gameplay-randomness flakes,
+none cutover-caused — details in the Phase 6 ledger row and doc 07 §A. (c) Local umbrella dir is still
 `upsilon-hub` though the GitHub repo is `upsilonumbrella`. (d) `mech_sanctum_token_renewal` atom
 *content* still describes Sanctum specifics; mechanism behavior is identical in Go — revise the
 text at Phase 6 per doc 05 §4; same now for the `api_websocket*` atoms, which still describe the
@@ -93,7 +91,7 @@ generated code would be wiped by the next `sqlc generate` — Phase 5 added many
 count grew). The hand-written Phase 5 diff adds zero errors — mounts moved into their handler
 files and `engineclient/client_skills.go` split off to respect the ≤10-links budget.
 
-### Session handover (updated 2026-07-06, post-Phase 5 — read before starting Phase 6)
+### Session handover (updated 2026-07-07, mid-Phase 6 — A/B/D done, next: C then E; read doc 07 first)
 
 **Porting conventions established in Phases 0–2** (follow these; they are load-bearing, not style):
 
@@ -185,17 +183,31 @@ files and `engineclient/client_skills.go` split off to respect the ≤10-links b
   upsilonbattle); entities partly in **upsilontypes**; `rule_progression`/`rule_stat_taxonomy`
   in umbrella `./docs`. Validate with the mechanical grep before assuming a prefix.
 
-**Phase 6 (cutover & decommission) entry points:**
+**Phase 6 (cutover & decommission) — state as of 2026-07-07 (plan + full detail: doc 07):**
 
-- Flip the proxy fully; collapse `app`/`ws`/`db-init` into one `hub` container (needs the
-  still-missing upsilonhub Dockerfile + a river-only migrate mode — see the compose review
-  below); archive Laravel; SPA moves out of battleui and is served statically.
-- `/api/v1/help` is the last unported endpoint (CodeDiscoveryService introspects PHP source —
-  decide: re-express over the Go route table, or retire).
-- Fix inbound `[[battleui:*]]` links once (doc 05); rewrite `mech_sanctum_token_renewal` +
-  `api_websocket*` atom content (caveat d); drop the `ws_channel_key` column (Phase 3 note).
-- Clear the E2E backlog (caveat b) **before** deleting PHP — the Laravel fallback is the
-  rollback path.
+- Sub-phase order locked A → (B, C, D any order) → E strictly last; **A, B, D are done**
+  (ledger row above). Laravel stays the rollback path until E.
+- Conventions added this phase, load-bearing:
+  - **The hub must run `APP_DEBUG=true` in dev/CI test stacks** — the CLI's loose message
+    matching (`jsAssertResponse`) only engages on the `-- DEBUG MODE -- ` prefix; the hub
+    port is `respond.ExceptionError`/`ExceptionErrorMeta` and is for *exception-derived*
+    errors only (findOrFail 404s, policy 403s, 401, 422, admin abort); direct-ApiResponder
+    errors stay unprefixed. `respond.SetDebug` rides the request context from router.go.
+  - Engine arena endpoints all bind the Standard Envelope now — `HandleArenaResurrect` was
+    the outlier (bare struct) and was fixed engine-side; don't reintroduce bare bindings.
+  - upsiloncli realtime is the hub SSE stream (`internal/ws/listener.go`): connection =
+    private channel, identity-keyed reconnect (session `user_id`), token re-read per attempt;
+    `IsSubscribed`/`Subscribe` are connectivity shims. `REVERB_*` env is gone.
+  - Hub ops surface: `-migrate-mode full|baseline|river-only`, `-seed`/`-seed-leaderboard`,
+    `HUB_SPA_DIR` for static SPA serving; one distroless image for all modes
+    (`upsilonhub/Dockerfile`, umbrella-root build context).
+- Remaining: **C** — create the `upsilonbattleui` submodule (repo location = user decision),
+  move SPA + 58 frontend atoms, de-Inertia (vue-router, 24 files, drop Ziggy, ApiDocs page
+  removed), then **E** — compose collapse, prod DB baseline handover, migration `000002`
+  (drop `ws_channel_key`), ATD flip (caveat d rewrites, `[[battleui:*]]` → `upsilonbattleui`),
+  battleui archive tag, Playwright re-baseline + CI re-enable (CI hub env: `APP_DEBUG=true`).
+- Known-red scenario families (not gates): ISS-102, ISS-103, friendly-fire flakes.
+- **Nothing committed yet** across upsilonhub/upsiloncli/upsilonapi/umbrella (2026-07-07).
 
 **Operational notes:**
 

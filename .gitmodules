@@ -28,3 +28,6 @@
 [submodule "upsilonhub"]
 	path = upsilonhub
 	url = ../upsilonhub.git
+[submodule "upsilonbattleui"]
+	path = upsilonbattleui
+	url = ../upsilonbattleui.git

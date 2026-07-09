@@ -159,7 +159,10 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 
 | Name | Date | Status | Severity | Oneliner |
 |---|---|---|---|---|
-| [Human player turns in PVE matches sometimes silently auto-passed by the engine](issues/ISS-101_20260622_pve_human_turn_silently_autopassed.md) | 2026-06-22 | Open | High | In some `1v1_PVE` matches, the human player's queued turns are silently auto-... |
+| [CLI scenarios that idle past TokenTTL between requests 401 mid-fight](issues/ISS-105_20260709_cli_token_starvation_long_fights.md) | 2026-07-09 | Open | Low | Hub tokens have `TokenTTL = 15m` with sliding renewal after 10m (`identity.go... |
+| [Parallel joins can strand a queue entry that then poisons every later 1v1_PVE join](issues/ISS-104_20260708_matchmaking_parallel_join_queue_poison.md) | 2026-07-08 | Open | High | `Matchmaker.Join` enqueues the joiner, then takes `QueueHead(scope, required)... |
+| [e2e_battle_starts_privacy_check asserts foe-loadout masking that no stack ever implemented](issues/ISS-103_20260707_privacy_check_asserts_unimplemented_masking.md) | 2026-07-07 | Open | Medium | `e2e_battle_starts_privacy_check` asserts foe entities expose no `equipped_sk... |
+| [Forfeit rejected in the engine's startup window right after match.found](issues/ISS-102_20260707_forfeit_before_engine_start_window.md) | 2026-07-07 | Open | Medium | Between arena creation and the engine's first tick, the arena is not yet "in ... |
 | [Devcontainer lost WebGL — Playwright 3D visual specs cannot render](issues/ISS-100_20260616_devcontainer_webgl_playwright_visual.md) | 2026-06-16 | Open | Medium | Headless Chromium in the current devcontainer **cannot create a WebGL context... |
 | [Action Endpoint Segregation](issues/ISS-090_20260427_action_endpoint_segregation.md) | 2026-04-27 | Open | Medium | Currently, all tactical actions (move, attack, skill, pass) are funneled thro... |
 | [Deterministic Daily Random Shop](issues/ISS-089_20260426_mechanic_random_shop_algorithm.md) | 2026-04-26 | Open | Medium | Implementation of a daily rotating shop system that provides a deterministic ... |
