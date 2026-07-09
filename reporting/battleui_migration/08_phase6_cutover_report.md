@@ -109,18 +109,20 @@ Run 2026-07-09 against the collapsed stack (`:8085` → hub `:8090`, no Laravel/
 
 Gate verdict: **green**. The only red is ISS-106, a pre-existing data-shape defect independent of the cutover (filed, workaround applied to the dev seed account).
 
-## 6. Decommission (E5 — pending user confirmation)
+## 6. Decommission (E5 — done 2026-07-09, user-confirmed)
 
-The cutover stack is green, so battleui is no longer the rollback path. The
-final decommission is intentionally held for explicit sign-off (it archives a
-GitHub repo and removes a submodule — irreversible from the umbrella's view):
+The cutover stack is green, so battleui is no longer the rollback path. With
+explicit sign-off:
 
-1. `git -C battleui tag archive/laravel-final && git -C battleui push origin archive/laravel-final`.
-2. `gh repo archive ecumeurs/battleui` — **awaiting user confirmation**.
-3. `git submodule deinit battleui && git rm battleui`, drop the `.gitmodules`
-   stanza, commit `feat(migration): Phase 6 done — battleui decommissioned`.
+1. battleui tagged `archive/laravel-final` at `d57e345` and pushed to origin —
+   the Laravel/Inertia final state is recoverable from that tag.
+2. `gh repo archive ecumeurs/battleui` — repo archived (`isArchived: true`).
+3. `git submodule deinit -f battleui && git rm battleui`, `.gitmodules` stanza
+   dropped, `.git/modules/battleui` gitdir cleaned. battleui is no longer a
+   submodule of the umbrella.
 
-Until step 3 lands, battleui remains a submodule at its Laravel-final HEAD.
+Rollback, if ever needed, is a git checkout of `archive/laravel-final` plus
+un-archiving the repo — the Laravel stack is preserved, just retired.
 
 ## 7. Known issues / follow-ups
 

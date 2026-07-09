@@ -202,7 +202,11 @@ files and `engineclient/client_skills.go` split off to respect the ≤10-links b
 - C and E landed 2026-07-09 (ledger row above); the dev stack runs hub-only behind `:8085`
   and the dev DB completed the baseline handover (`schema_migrations` v2, Laravel `migrations`
   table dropped). Known-red scenario families (not gates): ISS-102, ISS-103, ISS-105,
-  friendly-fire flakes.
+  ISS-106 (PHP-era `[]` skill payload), friendly-fire flakes.
+- **E5 decommission done 2026-07-09 (user-confirmed):** battleui tagged `archive/laravel-final`
+  (`d57e345`, pushed), GitHub repo `ecumeurs/battleui` archived, submodule removed from the
+  umbrella (`.gitmodules` stanza + `.git/modules/battleui` gone). Laravel rollback = checkout
+  the tag + un-archive; the stack is retired, not deleted.
 
 **Operational notes:**
 
