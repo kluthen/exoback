@@ -5,20 +5,22 @@ trigger: always_on
 # Upsilon Hub: Project Map & Infrastructure
 
 ## 1. Project Background
-Upsilon Hub is a multi-stack ecosystem designed for high-performance battle engine simulation and management. It bridges a Go-based core logic with a Laravel management interface and a flexible CLI for automation and testing.
+Upsilon Hub is a multi-stack ecosystem designed for high-performance battle engine simulation and management. It bridges a Go-based core logic with a Go platform gateway (the **hub**) and a flexible CLI for automation and testing. Since the Phase 6 cutover the hub owns auth, matchmaking, economy, admin, the realtime SSE stream and the database schema, and serves the standalone Vue SPA — the former Laravel `battleui` is decommissioned.
 
 ## 2. Who's Who (Service Architecture)
 
 | Component | Stack | Role | Default Port |
 |---|---|---|---|
-| **battleui** | Laravel / Vue | Management UI & Database Orchestration, Frontend | API: `8000` WS:`8080` Vue: `5173` |
+| **upsilonhub** | Go | Platform gateway — auth/identity, matchmaking, economy, admin, realtime SSE, DB schema; serves the API + SPA | Hub `8090`, front door (Caddy) `8085` |
+| **upsilonbattleui** | Vue 3 / Vite | Standalone SPA (management UI + battle client); built and served by the hub | Vite dev: `5173` |
 | **upsilonapi** | Go | The "Bridge" - provides API/WS access to the engine | `8081` |
 | **upsilonbattle** | Go | Core Battle Engine (BattleArena) | N/A (Embedded) |
-| **upsiloncli** | JS / Python | Scripting, E2E Testing, and Bot Orchestration | N/A |
+| **upsiloncli** | Go | Scripting, E2E Testing, and Bot Orchestration | N/A |
 | **upsilontypes** | Go | Shared type definitions and serialization | N/A |
 
 ## 3. Folder Organization
-- `/battleui`: The Laravel web application and Vue frontend.
+- `/upsilonhub`: The Go platform gateway (API, SSE, DB schema, migrations/seed; serves the SPA).
+- `/upsilonbattleui`: The standalone Vue 3 + Vite SPA (management UI + battle client).
 - `/upsilonapi`: The Go bridge server.
 - `/upsilonbattle`: Core engine logic (BattleArena).
 - `/upsiloncli`: Command-line tools and E2E test scenarios.

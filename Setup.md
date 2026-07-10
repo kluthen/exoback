@@ -9,7 +9,7 @@ The Upsilon system is orchestrated using Docker Compose (Project Name: `upsilon-
 | Service | Responsibility | Healthcheck |
 |---|---|---|
 | `db` | PostgreSQL 18 database for all system state. | `pg_isready` |
-| `db-init` | Hub image running `-migrate-mode baseline` on startup (adopts a Laravel-migrated schema, applies newer migrations). | (One-shot) |
+| `db-init` | Hub image running `-migrate-mode full` on startup (applies the embedded schema + River from scratch on a fresh DB). | (One-shot) |
 | `hub` | Go platform gateway serving the REST API, the SSE realtime stream and the SPA on `:8090`. | (via `proxy`) |
 | `proxy` | Caddy front door; publishes the client port and gates the stack on `:8085/up`. | `wget :8085/up` |
 | `engine` | Go-based battle engine for damage computation and logic. | `http://localhost:8081/health` |

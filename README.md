@@ -65,7 +65,7 @@ The Upsilon project is a complex ecosystem. For a detailed guide on how to prepa
 ### Cloning the Project
 Since the project relies on submodules, you must clone recursively to fetch all components:
 ```bash
-git clone --recursive git@github.com:ecumeurs/upsilon-hub.git
+git clone --recursive git@github.com:ecumeurs/upsilonumbrella.git
 ```
 If you have already cloned the repository, initialize the submodules with:
 ```bash
@@ -90,7 +90,18 @@ The project provides a pre-configured development environment via **[.devcontain
 > `go test ./upsilonhub/...`.
 
 #### Service Management
-The project includes a suite of scripts in the `scripts/` directory for local service management and testing:
+The project includes a suite of scripts in the `scripts/` directory for local service management and testing.
+
+**First-time dev bring-up sequence** (inside the devcontainer):
+```bash
+./scripts/build_services.sh   # build engine, hub, CLI binaries + SPA
+./scripts/seed_ci.sh          # migrate (-migrate-mode full) + seed a fresh DB — required once
+./scripts/start_services.sh   # launch engine (:8081), hub (:8090), Vite (:5173)
+./scripts/trigger_one_ci_test.sh e2e_customer_onboarding   # run one CLI-backed e2e test
+```
+> The hub does **not** auto-migrate on boot; `seed_ci.sh` is the one-shot that
+> applies the schema and seeds the catalog / test accounts. `trigger_one_ci_test.sh`
+> drives the CLI in `--local` mode, which targets the hub directly on `:8090`.
 
 - **[scripts/start_services.sh](scripts/start_services.sh)**: Launches the full Upsilon stack (Upsilon Engine, Upsilon Hub, and Vite dev server) in the background. It automatically verifies that all ports are listening before exiting.
 - **[scripts/stop_services.sh](scripts/stop_services.sh)**: Gracefully stops all tracked services and ensures ports are freed.
@@ -99,7 +110,7 @@ The project includes a suite of scripts in the `scripts/` directory for local se
 - **[scripts/trigger_all_ci_tests.sh](scripts/trigger_all_ci_tests.sh)**: Executes the full local test suite (E2E + Edge Cases) against the running local stack.
 
 #### Development Utilities
-- **[scripts/build_services.sh](scripts/build_services.sh)**: Rebuilds core service binaries (API and Engine).
+- **[scripts/build_services.sh](scripts/build_services.sh)**: Rebuilds the core binaries (Engine, Hub, CLI) and the SPA bundle.
 - **[scripts/clear_matches.sh](scripts/clear_matches.sh)**: Authoritatively clears active match records from the database and engine cache.
 - **[scripts/seed_ci.sh](scripts/seed_ci.sh)**: Resets and seeds the database with standard CI testing data.
 - **[scripts/zombie_killer.sh](scripts/zombie_killer.sh)**: Forcefully kills any orphaned Upsilon processes (CLI bots, detached engines).
@@ -109,10 +120,11 @@ The project includes a suite of scripts in the `scripts/` directory for local se
 
 UpsilonBattle employs a robust CI/CD pipeline via GitHub Actions to ensure code quality, architectural integrity, and business rule compliance.
 
-### Automated Workflows (`.github/workflows/`)
-- **[Unit Tests](.github/workflows/unit-tests.yml)**: Runs Go unit tests for all backend modules (including the hub's testcontainers feature suites).
-- **[Lint & Build](.github/workflows/lint-and-build.yml)**: Performs static analysis (Go vet) and verifies that all core components and Docker images build successfully.
-- **[E2E Battle Tests](.github/workflows/e2e-battles.yml)**: Orchestrates a full ephemeral Docker stack to run integration tests. It uses specialized CLI bots to simulate real player journeys and verify complex game mechanics.
+### Automated Workflow (`.github/workflows/ci.yml`)
+A single **CI Pipeline** runs three staged jobs on push / PR to `main`:
+- **Build & Lint**: static analysis (Go vet), verifies all core components build, and checks the Docker images.
+- **Go Unit Tests**: Go unit tests for all backend modules (including the hub's testcontainers feature suites).
+- **Integration & E2E**: orchestrates the ephemeral [docker-compose.ci.yaml](docker-compose.ci.yaml) stack and runs the `upsiloncli` customer + edge scenario suites — specialized CLI bots simulating real player journeys through the hub and engine.
 
 ### Code Health Standards (`scripts/code_health_check.py`)
 Upsilon enforces strict maintainability standards across all supported languages (Go, Python, JS, Vue). These are verified locally via the pre-commit hook and in CI.
