@@ -77,7 +77,7 @@ the edge of the requirement.
 | 10 | edge_attack_skill_cooldown | ✅ | 🔧 | 🔧 | ✅ | 🔧 | 🔧 | **CORRECTED-GREEN, ~4s** — was false-green (coin-flip branch, unrelated failure logged PASSED); full rewrite to deterministic single-case cast→cooldown-reject. ISS-111 filed (cooldown never decrements, High) |
 | 11 | edge_attack_target_no_entity | 🔧 | 🔧 | 🔧 | ✅ | ✅ | 🔧 | **CORRECTED-GREEN, ~2s** — relinked to `mechanic_multi_entity_cell_system` (no dedicated attack-validation atom exists, ATD gap flagged); added missing prod spec-link + strict `error_key` assert; SKIP→hard fail |
 | 12 | edge_attack_target_not_in_range | 🔧 | 🔧 | 🔧 | 🔧 | ✅ | 🔧 | **CORRECTED-GREEN, 2-3s** — relinked to `rule_combat_range_validation`; was a false green testing occupancy (dup of #11), not range — rewrote to target farthest live foe, strict `entity.attack.outofrange` assert |
-| 13 | edge_attack_target_out_of_grid | ✅ | 🔧 | 🔧 | ✅ | 🔧 | 🔧 | **CORRECTED-GREEN, 1-3s** — phantom link→`entity_grid`; added missing prod spec-link; removed dead second block that silently absorbed unrelated failures; strict `error_key` assert added |
+| 13 | edge_attack_target_out_of_grid | ✅ | 🔧 | 🔧 | ✅ | 🔧 | 🔧 | **CORRECTED-GREEN, 1-3s** — phantom link→`entity_grid`; added missing prod spec-link; removed dead second block that silently absorbed unrelated failures; strict `error_key` assert added. Post-audit CI showed it IS ISS-110-exposed (pre-turn squad wipe), contra the original note — see findings log |
 | 14 | edge_attack_wrong_controller_with_2 | 🔧 | 🔧 | ✅ | ✅ | ✅ | 🔧 | **CORRECTED-GREEN, ~3s** — relinked to `mech_move_validation` (shared `CheckControllerForEntity`, same reuse pattern as #11); dropped phantom+tangential links; added missing prod spec-link |
 
 ### Phase 3 — Auth
@@ -204,6 +204,7 @@ existing test-link's subsystem is correct.**
 - C4 ✅ `attack_checks.go:38-41` rejects via `Grid.CellAt`→`PositionIsInGrid`; verified live.
 - C5 🔧 removed a dead second "attack enemy in-grid" block whose catch just logged "may be expected" either way — it silently absorbed an unrelated `entity.attack.outofrange` failure in the baseline run without flagging it.
 - **Disposition: CORRECTED-GREEN, 1-3s** (4 runs, no flakiness — deterministic, single-turn, not subject to ISS-108/ISS-110). No new defects.
+- **Correction (2026-07-12, post-audit CI run `29192473723`):** the "not subject to ISS-110" claim above was wrong — the scenario joins `1v1_PVE` and must survive to its first `waitNextTurn()`, so it IS in ISS-110's blast radius like every other survival-dependent attack/movement scenario. CI hit exactly that: squad wiped pre-turn (player's 30-HP characters dead at 0 HP, PVE monsters untouched), `waitNextTurn()` returned null → "Match ended unexpectedly". Known-class flake, not a defect in the rewrite; the assertion logic itself is still deterministic once the bot survives to act.
 
 ### edge_attack_target_not_in_range — CORRECTED-GREEN (wave 3)
 - C1 🔧 all existing links wrong: `mech_skill_validation_range_limit_verification` phantom; `mech_combat_attack_computation` real but wrong domain (damage math, zero code_links); `entity_character` tangential (stat schema). Correct atom is `rule_combat_range_validation` — already properly spec-linked in prod (`attack_checks.go:64`), clean ancestry, logic text matches code exactly. Was Impl=1/Tests=0 (genuinely undertested) before fix.
@@ -676,4 +677,16 @@ Final tally across all 11 phases: 55/55 scenarios audited against all six criter
 - `trigger_one_ci_test.sh`'s trigger-name normalization is inconsistent across scenarios (#33's finding).
 
 Next step: this suite has been running in reporting-only CI mode since ISS-107 was filed (per `ci_edge_case_reporting.md`'s own governing constraint, see the file's top-level framing). With the full audit now closed, promoting the suite back to a real CI gate is a decision for a human to make, not this audit to enact — the two intentionally-RED scenarios (#7, #21) would need their underlying issues (ISS-109, ISS-113) resolved first, or the gate would need to explicitly except them.
+
+## Post-audit CI verification (2026-07-12, run `29192473723`, commit `e5140e3`)
+
+All audited work committed and pushed across all 10 repos; full CI pipeline **green** (edge suite reporting-only). Edge-suite results, all four failures accounted for:
+- ❌ `edge_movement_obstacle_collision` (#1) — **ISS-108**, the documented ~20% board-gen flake, exact expected message.
+- ❌ `edge_char_reroll_post_match` (#21) — **ISS-113**, intentionally RED.
+- ❌ `edge_admin_private_data_access` (#49) — **ISS-116**, intentionally RED. (Its teardown was also fixed pre-commit to register before the expected-RED assertions, so CI runs no longer orphan `privdata_bot_*` accounts.)
+- ❌ `edge_attack_target_out_of_grid` (#13) — **ISS-110** pre-turn PVE squad wipe; corrects the audit's own "not subject to ISS-110" claim (see #13's findings-log correction). Any survival-dependent `1v1_PVE` attack/movement scenario shares this exposure.
+
+No unexplained failures; the CLI-observed SKIPs are the CI runner's multi-agent (`_with_2`) and `.disabled` exclusions plus #7's documented ISS-109 skip. **This closes ISS-107's audit execution; remaining decisions (gate promotion, ISS-108→116 fixes) are tracked in their own issues.**
+
+Note for readers of the CI `edge_case_report.md` artifact: its EC-numbering and per-row "ATD Atom" column come from the report generator's own stale mapping (it still lists pre-audit phantom compound atom names, e.g. `mech_skill_validation_*`). The scenario files and this tracker are the source of truth; the generator's mapping is cosmetic and was not in the audit's scope — candidate for the `trigger_one_ci_test.sh` normalization follow-up already noted above.
 
