@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".agent/rules/*.md"],
+  "skills": {
+    "paths": [".agent/skills"]
+  },
+  "lsp": {
+    "gopls": {"command": ["gopls"]},
+    "typescript": { "disabled": true }
+  },
+  "mcp": {
+    "atd": {
+      "type": "local",
+      "command": ["atd", "serve"],
+      "enabled": true
+    }
+  }
+}
