@@ -115,6 +115,7 @@ The project includes a suite of scripts in the `scripts/` directory for local se
 - **[scripts/seed_ci.sh](scripts/seed_ci.sh)**: Resets and seeds the database with standard CI testing data.
 - **[scripts/zombie_killer.sh](scripts/zombie_killer.sh)**: Forcefully kills any orphaned Upsilon processes (CLI bots, detached engines).
 - **[scripts/stress_test.py](scripts/stress_test.py)**: High-concurrency performance orchestration script for load testing.
+- **[scripts/repo_status.sh](scripts/repo_status.sh)**: One-shot source-control health check across the umbrella **and all submodules** — branch, short HEAD, push-sync (ahead/behind upstream), submodule-pointer coherence, and working-tree cleanliness, in a single aligned table. Pass `--fetch` to refresh remote-tracking refs first. Exits non-zero if any repo is dirty, has unpushed commits, lacks an upstream, or the umbrella points at a commit that isn't the submodule's checked-out HEAD — making it a handy **pre-/post-push preflight** for this multi-repo tree.
 
 ## Continuous Integration & Quality control
 

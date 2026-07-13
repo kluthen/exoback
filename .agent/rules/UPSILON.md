@@ -52,9 +52,10 @@ Upsilon Hub is a multi-stack ecosystem designed for high-performance battle engi
 ## 5. Testing Toolkit
 
 ### Core Scripts
-- `scripts/trigger_one_ci_test.sh <path>`: Run a specific E2E test scenario (e.g. `tests/scenarios/edge_movement_entity_collision.js`).
+- `scripts/trigger_one_ci_test.sh <name>`: Run a specific E2E test scenario. Accepts the scenario name with or without the `edge_`/`e2e_` prefix and `.js` suffix (e.g. `movement_entity_collision`).
 - `scripts/run_all_unit_tests.sh`: Executes all Go and PHP unit tests.
 - `scripts/check_services.sh`: Health check for running docker/local services.
+- `scripts/repo_status.sh [--fetch]`: One-shot health check of the umbrella **and every submodule** — branch, HEAD, push-sync (ahead/behind), submodule-pointer coherence, and working-tree cleanliness in one aligned table. Exits non-zero if anything is dirty / unpushed / drifted, so it works as a pre- and post-push preflight. Run it before bumping submodule pointers and after pushing to confirm a coherent snapshot.
 
 ### Manual Verification
 - `upsiloncli --local --farm`: Starts a local match with automated bot players.
