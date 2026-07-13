@@ -32,9 +32,16 @@ if [ -z "$SCRIPT" ]; then
     exit 1
 fi
 
-# Find the script if only name was provided
+# Find the script if only name was provided.
+# Normalize: accept the name with or without a trailing ".js", and with or
+# without the "edge_" prefix (e.g. "char_reroll_post_match" resolves the same
+# as "edge_char_reroll_post_match" or "edge_char_reroll_post_match.js").
 if [ ! -f "$SCRIPT" ]; then
-    FOUND=$(find upsiloncli/tests/scenarios -name "${SCRIPT}.js" | head -n 1)
+    BASE="${SCRIPT%.js}"
+    FOUND=$(find upsiloncli/tests/scenarios -name "${BASE}.js" | head -n 1)
+    if [ -z "$FOUND" ] && [[ "$BASE" != edge_* ]]; then
+        FOUND=$(find upsiloncli/tests/scenarios -name "edge_${BASE}.js" | head -n 1)
+    fi
     if [ -n "$FOUND" ]; then
         SCRIPT=$FOUND
     else

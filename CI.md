@@ -152,7 +152,7 @@ The following scenarios map directly to the **Conformity Matrix** and validate s
 | **CR-13** | Password Policy Enforcement | `[[rule_password_policy]]` | `e2e_password_policy.js` |
 | **CR-14** | GDPR Data Portability | `[[api_profile_export]]` | `e2e_gdpr_portability.js` |
 | **CR-15** | Admin User Management | `[[uc_admin_user_management]]` | `e2e_admin_user_management.js` |
-| **CR-16** | Session Timeout Handling | `[[requirement_req_ui_session_timeout]]` | `e2e_session_timeout.js` |
+| **CR-16** | Session Timeout Handling | `[[req_security_token_ttl]]` | `e2e_session_timeout.js` |
 | **CR-17** | API Self-Discovery | `[[requirement_customer_api_first]]` | `e2e_api_discovery.js` |
 | **CR-18** | Admin Full Lifecycle | `[[uc_admin_login]]` | `e2e_admin_full_lifecycle.js` |
 | **CR-19** | Admin History Management | `[[uc_admin_history_management]]` | `e2e_admin_history_management.js` |

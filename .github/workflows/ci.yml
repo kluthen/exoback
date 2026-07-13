@@ -183,12 +183,12 @@ jobs:
           docker compose -f docker-compose.ci.yaml exec -T tester /bin/sh ./tests/run_all_scenarios.sh
 
       - name: "E2E: Run Edge Case Suite"
-        # Reporting-only until the edge-scenario audit (ISS-107) dispositions the
-        # known-red scenarios (stale assertions / randomness / timing —
-        # ISS-102/103/105 + friendly-fire). CI gates on builds + unit + the
-        # integration boot + customer scenarios; the edge suite's result is in
-        # the uploaded artifacts.
-        continue-on-error: true
+        # GATING as of the ISS-107 audit close (2026-07-12): all 55 scenarios
+        # were audited and corrected, so a red here is now a real regression and
+        # fails the build. The handful of still-open KNOWN issues (ISS-108/110
+        # flakes, ISS-116 intentional-red) are quarantined inside
+        # run_all_edge_cases.sh — they still run and report, but don't gate,
+        # until their issues are fixed. See ci_edge_case_reporting.md.
         run: |
           docker compose -f docker-compose.ci.yaml exec -T tester /bin/sh ./tests/run_all_edge_cases.sh
 

@@ -171,3 +171,46 @@ semantic search post-index, `atd_check semantic:true` (token cost),
 
 Happy to re-run any of these against a patched server — every repro above is a
 single MCP call in this workspace.
+
+---
+
+## Addendum — 2026-07-12, from the ISS-107 edge-case audit
+
+**Reporter:** Bastien (findings collected by Claude during the ISS-107 audit of
+the 55 `upsiloncli/tests/scenarios/edge_*.js` CI scenarios). Same workspace,
+five months of scenario/link drift later. Two items, both reinforcing §2.
+
+### A. §2 (bare-id → silent NO_IMPL) is the single highest-yield defect we hit — please prioritise it above its current #4 slot
+Across the 55-scenario audit, "author wrote the **bare** id, it resolved to a
+different, zero-coverage phantom stub than the module-qualified form that
+carries the real links" was the most common single defect class — recurred in
+~15 of 55 scenarios. It is actively self-propagating: because the bare form
+returns a clean zero (not an error), authors copy-paste it between files and
+nothing flags it, while the qualified form sits right there in the same atom's
+`test_links`. Fresh first-hand repros in this workspace:
+- `atd_trace {atom: "rule_password_policy"}` → 0-coverage phantom;
+  `atd_trace {atom: "upsilonapi:rule_password_policy"}` → 100% impl/test, and
+  its own `test_links` already lists files that tag it with the *bare* id. The
+  bare form appears in ~15 files repo-wide (incl. the atom's own doc).
+- Same shape confirmed for `req_ui_session_timeout`
+  (real: `upsilonbattleui:req_ui_session_timeout`),
+  `mech_character_reroll` (real: `upsilonbattle:mech_character_reroll`),
+  `api_leaderboard`, `api_websocket`, and ~a dozen others.
+
+The §2 ask stands and we'd raise its priority: bare ids should resolve
+workspace-wide (like `atd_query` already does) **or** fail loudly with a "did
+you mean `upsilonapi:rule_password_policy`?" — a silent zero is worst-case,
+it reads as genuinely missing coverage and trains authors to leave it wrong.
+
+### B. New: a `requirement_`-prefixed id resolves to *nothing* (not-found), also silently
+`atd_trace {atom: "requirement_req_ui_session_timeout"}` → not found at all
+(distinct from §2's phantom-with-zero-coverage: here there is no object).
+This looks like an author pasting the atom's **layer/type** (`requirement`)
+in front of its id and the tool neither stripping the type prefix nor erroring
+helpfully. Found in the CR-16 mapping (`CI.md`, `tests/ci_report.sh`,
+`e2e_session_timeout.js` — since corrected in-repo to the real backend atom
+`req_security_token_ttl`). Same remedy as §2: resolve or fail loudly, never
+return a silent empty.
+
+Both are single-MCP-call repros in this workspace; happy to re-run against a
+patched server.
