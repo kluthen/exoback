@@ -59,9 +59,16 @@ services:
       - APP_DEBUG=true
       - UPSILON_API_URL=http://engine:8081
       - UPSILON_WEBHOOK_URL=http://proxy:8085/api/webhook/upsilon
+      # Phase-3 economy swap: wallet reads, purchases and the award worker go
+      # to the extracted upsiloneconomy service over the internal S2S surface.
+      # (Empty ECONOMY_INTERNAL_URL would keep the in-process rollback impl.)
+      - ECONOMY_INTERNAL_URL=http://economy:8092
+      - S2S_TOKEN=ci-internal-token
     depends_on:
       hub-seed:
         condition: service_completed_successfully
+      economy:
+        condition: service_healthy
 
   # --- upsilonauth (:8091) — dark until the Phase-4 Caddy cutover ------------
   auth-migrate:

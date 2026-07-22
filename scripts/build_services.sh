@@ -24,6 +24,13 @@ go build -o bin/upsilonhub ./cmd/upsilonhub
 cd ..
 
 echo "---------------------------------------"
+echo "Building Upsilon Economy..."
+echo "---------------------------------------"
+cd upsiloneconomy || exit
+go build -o bin/upsiloneconomy ./cmd/upsiloneconomy
+cd ..
+
+echo "---------------------------------------"
 echo "Building SPA (upsilonbattleui)..."
 echo "---------------------------------------"
 cd upsilonbattleui || exit

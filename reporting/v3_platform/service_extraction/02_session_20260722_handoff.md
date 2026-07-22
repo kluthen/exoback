@@ -41,30 +41,37 @@
 - **Issues filed**: ISS-117 (upsilonapi Dependabot 7-critical), ISS-118 (GDPR per-game
   export gap — gate before Phase-4 cutover), ISS-119 (match-start race, local dev only).
 
-## In flight — Phase 3 (hub economy swap), branch `phase3-economy-swap`
+## Phase 3 (hub economy swap) — LANDED 2026-07-22 (merged to main, pushed)
 
-Branches pushed on **upsilonhub** and **upsilonplatform** (do NOT merge to main yet — hub
-now imports upsilontypes and its Dockerfile isn't updated, CI would break).
+All three `phase3-economy-swap` branches merged → main and pushed (platform `efdcef3`,
+economy `ba61a64`, hub `1bbb228`), umbrella pointers bumped. The full swap is live: the hub
+reads wallets, runs purchases and drains credit awards against the extracted
+**upsiloneconomy**; economy DB holds all money/item writes, hub economy tables are dormant.
 
-**Code complete & tested** (hub suite + platform suite green on the branch):
-economyclient over httpx; `economy.Service` reshaped (AwardCredits→wallet reads
-GetWallet/ListWallets; awards moved to an `IdempotentAwarder` seam); River worker
-`internal/awards/` + enqueue in `processCredits` (idempotency key = sha256 of
-match|player|source|ordinal); `identity.User.Credits` removed, all reads through the wallet
-seam; migration 000003 drops the equipment→inventory FKs; hub seed no longer ships the shop
-catalog; config: `ECONOMY_INTERNAL_URL` (empty ⇒ in-process rollback impl) + `S2S_TOKEN`.
+**Core swap (from the WIP branch):** economyclient over httpx; `economy.Service` reshaped
+(wallet reads GetWallet/ListWallets; awards on an `IdempotentAwarder` seam); River worker
+`internal/awards/` + enqueue in `processCredits` (key = sha256 match|player|source|ordinal);
+migration 000003 drops equipment→inventory FKs; hub seed drops the shop catalog; config
+`ECONOMY_INTERNAL_URL` (empty ⇒ in-process rollback) + `S2S_TOKEN`.
 
-**Remaining to finish Phase 3** (was cut off):
-1. `upsilonhub/Dockerfile`: add `./upsilontypes ./upsilonmapdata ./upsilontools` to COPY +
-   `go work init` (private pseudo-versioned siblings) and extend
-   `upsilonhub/Dockerfile.dockerignore` allowlist accordingly; verify `docker build`.
-2. `docker-compose.ci.yaml`: hub env `ECONOMY_INTERNAL_URL=http://economy:8092`,
-   `S2S_TOKEN=ci-internal-token`, `depends_on economy: service_healthy`.
-3. `scripts/{build,start,check}_services.sh`: run economy (:8092) in dev (S2S dev token).
-4. Gateway tests against an httptest fake of the economy internal API (meta.reason→
-   PurchaseError mapping, S2S header, award replay) + worker unit tests.
-5. Full stack up + scenario suite (expect green except ISS-119's four); assert purchase
-   writes land in the `upsiloneconomy` DB, then merge branch → main, bump pointers.
+**Finish work this session:** Dockerfile brings in upsilontypes/upsilonmapdata/upsilontools;
+`docker-compose.ci.yaml` wires the hub to economy; dev scripts run economy full-swap;
+economyclient + award-worker unit tests.
+
+**Two real bugs the CI stack caught (the WIP "code complete" claim missed both):**
+1. **Economy envelope unwrap** — `upsiloneconomy` bailed on an empty `request_id`, but httpx
+   always wraps and sends `""` (the award worker's background ctx). Every enveloped POST bound
+   the outer object → awards 422, shop-create 500. Fixed to unwrap on the `data` key.
+2. **Equipment-loadout read path** — `BattleLoadouts` still joined the (now-empty) hub
+   catalog/inventory → equipped items gave 0 buffs. Rewired **fetch-at-battle** via a
+   `character.EquippedItemResolver` economy seam (character stays economy-free; battle supplies
+   the economy-backed resolver; skill_templates resolved hub-side). The plan had designed only
+   the equip *write* ownership check, not this read path — a genuine scope gap.
+
+**Verified:** economy DB holds inventory/credit txns + moved wallets, hub DB 0 economy writes;
+hub logs zero downstream/award errors; equipment scenarios green; full hub + economy suites
+green. Scenario suite 31–32/37 — residual are pre-existing local-only flakes (ISS-119
+match-start race, engine pathing, foe skill-visibility), non-deterministic, no economy errors.
 
 ## Then: Phase 4 (re-cut by the remodel)
 
