@@ -11,6 +11,7 @@ migration lives in [`../battleui_migration/`](../battleui_migration/); current-s
 | [`06_v3_platform_constraints.md`](06_v3_platform_constraints.md) | The original user-direction constraints the architecture derives from. | Design constraints |
 | [`04_observability.md`](04_observability.md) | OpenTelemetry integration design. Hub is instrumented from it; platform-wide rollout is pending. | Partially delivered (hub only) |
 | [`service_extraction/00_identity_economy_extraction.md`](service_extraction/00_identity_economy_extraction.md) | Identity (→V3-1a) & Economy (post-v3.0) extraction plan along the migration seams. | **In progress 2026-07-22** (both pulled into the current extraction) |
+| [`service_extraction/02_session_20260722_handoff.md`](service_extraction/02_session_20260722_handoff.md) | **Continuation handoff** for the 2026-07-22 extraction session: decisions, what landed, Phase-3 WIP branch state, exact next steps for Phases 3-5. | Active handoff |
 | [`how_to_add_a_service.md`](how_to_add_a_service.md) | **The new-service playbook**: ATD governance, git/submodule wiring, service shell, per-service databases, S2S security, Docker/CI/E2E, OTel — every step as actually exercised by the upsilonauth/upsiloneconomy extractions. | Living reference |
 | [`service_map.md`](service_map.md) | **Service→project attribution + bridge map.** The anti-getting-lost index; per-service contract/vision ownership and OTel status. | Living reference |
 
