@@ -91,6 +91,11 @@ match-start race, engine pathing, foe skill-visibility), non-deterministic, no e
   (auth-outage 401 parity, economy-outage, award-replay-after-restart).
 - NO auth→hub/economy composition (remodel): login returns account+registrations only.
   Mind ISS-118 (export scope) before cutover.
+- **GATE — ISS-120 (High):** internal S2S calls currently ship an empty `request_id`
+  (the hub never propagates its inbound `X-Request-ID` into httpx; durable jobs mint none).
+  A correlation id is mandatory — adopt-then-propagate, mint at a true origin, never empty.
+  Phase 4 adds the authclient introspection hop and the enroll→auth push (longer internal
+  chains), so this must be rectified as part of / before Phase 4, not deferred.
 
 ## Then: Phase 5
 
