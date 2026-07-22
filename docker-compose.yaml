@@ -60,6 +60,9 @@ services:
       - "5433:5432"
     volumes:
       - laravel_db_data:/var/lib/postgresql
+      # Per-service databases (upsilon, upsilonauth, upsiloneconomy) — only runs on a
+      # fresh volume; `docker compose down -v` to reprovision an existing dev database.
+      - ./deploy/initdb:/docker-entrypoint-initdb.d:ro
     networks:
       - ollama_network
 

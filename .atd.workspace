@@ -49,6 +49,18 @@
     {
       "name": "upsilonaws",
       "path": "upsilonaws"
+    },
+    {
+      "name": "upsilonplatform",
+      "path": "upsilonplatform"
+    },
+    {
+      "name": "upsilonauth",
+      "path": "upsilonauth"
+    },
+    {
+      "name": "upsiloneconomy",
+      "path": "upsiloneconomy"
     }
   ]
 }

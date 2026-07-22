@@ -35,7 +35,7 @@ jobs:
         run: go work sync
 
       - name: Go Vet (Explicit Modules)
-        run: go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/...
+        run: go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... ./upsilontypes/... ./upsilonplatform/...
 
       - name: Build Upsilon API
         run: go build -o /dev/null ./upsilonapi
@@ -97,7 +97,7 @@ jobs:
       - name: Run Go Tests (Explicit Modules)
         # 600s: the hub feature tests boot throwaway Postgres containers
         # (testcontainers) — the first image pull eats into the timeout.
-        run: go test -count=1 -timeout 600s -json ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... > go-test-results.json 2>&1 || true
+        run: go test -count=1 -timeout 600s -json ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... ./upsilontypes/... ./upsilonplatform/... > go-test-results.json 2>&1 || true
 
       - name: Check for Failures
         run: |

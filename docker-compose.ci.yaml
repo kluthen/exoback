@@ -13,6 +13,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: upsilon
+    volumes:
+      # Per-service databases (upsilon, upsilonauth, upsiloneconomy); CI stacks are
+      # always fresh, so the initdb scripts run on every `up`.
+      - ./deploy/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s

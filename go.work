@@ -2,11 +2,14 @@ go 1.25.0
 
 use (
 	./upsilonapi
+	./upsilonauth
 	./upsilonbattle
 	./upsiloncli
+	./upsiloneconomy
 	./upsilonhub
 	./upsilonmapdata
 	./upsilonmapmaker
+	./upsilonplatform
 	./upsilonserializer
 	./upsilontools
 	./upsilontypes
