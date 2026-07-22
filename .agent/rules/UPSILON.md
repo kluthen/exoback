@@ -27,6 +27,9 @@ shape is [`reporting/architecture_anchor.md`](../../reporting/architecture_ancho
 | **upsilonapi** | Go | The "Bridge" — high-performance JSON API for the engine; handles match state and engine callbacks. Not yet OTel-instrumented. | `8081` |
 | **upsilonbattle** | Go | Core Battle Engine (`BattleArena`) — initiative, movement validation, damage, combat state. | Embedded in `upsilonapi` |
 | **upsiloncli** | Go | Interactive terminal, E2E testing, and bot orchestration (goja JS scenarios). | N/A |
+| **upsilonauth** ⚠️ | Go | **Extraction in progress — dark until cutover.** SSO trust seam being scaffolded out of the hub's `identity` package (2026-07-22): accounts, opaque tokens, introspection, GDPR, roles. Public via Caddy at `/api/v1/auth/*` **only after the Phase 4 cutover**; today nothing routes to it and the hub's in-process identity remains authoritative. Own database `upsilonauth`. | `8091` |
+| **upsiloneconomy** ⚠️ | Go | **Extraction in progress — dark, internal-only.** Wallet/ledger/market being scaffolded out of the hub's `economy` package (2026-07-22); stays behind the hub (no Caddy route, ever — hub keeps the public shop/inventory endpoints and calls it S2S). Own database `upsiloneconomy`. | `8092` |
+| **upsilonplatform** ⚠️ | Go (library) | **Shared mechanical kit, extracted from the hub 2026-07-22.** `respond` (envelope), `clock`, `observability`, `database`, `jobs` (River wrapper), `httpx` (S2S client). Every new/extracted service composes on it — copy nothing. Not a running service; no port. | N/A |
 
 ### 2.1 Shared Libraries (Go modules)
 Standard definitions shared across the Go services:
@@ -35,9 +38,20 @@ Standard definitions shared across the Go services:
 - **upsilonmapdata** — geometric board data structures and grid boundaries.
 - **upsilonmapmaker** — procedural map/grid generation.
 - **upsilontools** — shared utilities and math helpers.
+- **upsilonplatform** — shared mechanical kit (envelope/clock/observability/database/jobs/httpx);
+  see §2 above — extracted from the hub 2026-07-22, used by `upsilonauth` and `upsiloneconomy`.
 
 ### 2.2 Infrastructure
 - **upsilonaws** — Bash-based AWS provisioning (VPC, EC2, RDS PostgreSQL 18, Route 53, nginx SSL proxy) deploying to `eu-west-3`.
+
+### 2.3 Databases (one per service, 2026-07-22)
+Extraction moves to **one database per service on the shared Postgres instance** (dev
+`postgres:18` container / prod RDS), not a shared database with per-domain schemas: `upsilon`
+(hub), `upsilonauth`, `upsiloneconomy` — each with its own `DATABASE_URL`, relocatable later to
+a dedicated instance with no SQL changes. Provisioned by `deploy/initdb/create_databases.sql`
+(idempotent `\gexec`, mounted at cluster init — an existing dev volume needs
+`docker compose down -v` once to pick it up). No cross-database SQL, ever; cross-service
+references are UUID-only through the owning service's API.
 
 ## 3. Folder Organization
 

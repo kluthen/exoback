@@ -10,8 +10,8 @@ tags: []
 parents:
   - [[upsilonbattleui:req_player_experience]]
 dependents:
-  - [[upsilonbattleui:ui_registration]]
   - [[us_new_player_onboard]]
+  - [[upsilonbattleui:ui_registration]]
 ---
 # Player Registration Use Case
 

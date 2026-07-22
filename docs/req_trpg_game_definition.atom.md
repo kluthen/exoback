@@ -9,9 +9,9 @@ tags: [trpg, combat, game-definition]
 parents:
   - [[upsilonbattleui:req_player_experience]]
 dependents:
-  - [[upsilonbattleui:ui_battle_arena]]
   - [[mechanic_battle_engine_stress_testing]]
   - [[upsilonbattle:req_skill_generation]]
+  - [[upsilonbattleui:ui_battle_arena]]
 human_name: TRPG Game Definition
 ---
 

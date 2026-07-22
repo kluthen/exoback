@@ -42,6 +42,7 @@ boundaries below decide where each single contract/vision lands.
 | **upsilonbattle** | `repo:upsilonbattle` | Battle domain rules/content (ATD + Go). | No | ❌ n/a today |
 | **upsilontypes** | `repo:upsilontypes` | Cross-process shared vocabularies (where types cross a service boundary). | Medium — shared vocabulary carrier | n/a (lib) |
 | upsilonmapdata / upsilonmapmaker / upsilontools / upsilonaws | `repo:*` | Map content, map tooling, dev tooling, infra. | No | ❌ n/a |
+| **upsilonplatform** | `repo:upsilonplatform` | Shared mechanical kit extracted **verbatim** from `upsilonhub` on 2026-07-22: `respond` (envelope), `clock`, `observability`, `database`, `jobs` (River wrapper), plus new `httpx` (S2S client — traceparent, `X-Internal-Token`, `X-Request-ID`). Every new service composes on it; **copy nothing** — parity across serving processes can't survive copy-drift. | Medium — mechanical carrier every extracted service depends on, not a domain seam | n/a (lib); every service built on it is born OTel-instrumented (§7) |
 
 ## 2. Platform substrate services (`internal/platform/…` today)
 
@@ -50,8 +51,8 @@ out was built during the migration (in-process call → network call is an impl 
 
 | Service | Owning project (target) | Home now | Target | Bridge? | Contract/Vision | Provenance |
 |---|---|---|---|---|---|---|
-| **identity / auth** | **upsilonauth** (new) | `pkg:upsilonhub/internal/platform/identity` | `repo:upsilonauth` (SSO) — hub becomes a client | **Yes — trust seam every service validates tokens against** | own pair (upsilonauth) | [arch] V3-1a, scheduled |
-| **economy** | **upsilon-economy** (candidate) | `pkg:upsilonhub/internal/platform/economy` | own service — wallet/ledger/market | Yes — money/items seam for all games | own pair | [arch] Phase 8, slides past v3.0 |
+| **identity / auth** | **upsilonauth** | `repo:upsilonauth` (scaffold phase, dark — not yet routed) + `pkg:upsilonhub/internal/platform/identity` (still authoritative until the Phase 4 client swap + Caddy cutover) | `repo:upsilonauth` (SSO) — hub becomes a client | **Yes — trust seam every service validates tokens against** | `contract_auth_service` + `vision_auth` — **settled** | **[2026-07-22] extraction IN PROGRESS** — repo exists (submodule wired), Phase 1 scaffold underway; supersedes "[arch] V3-1a, scheduled" |
+| **economy** | **upsiloneconomy** | `repo:upsiloneconomy` (scaffold phase, dark) + `pkg:upsilonhub/internal/platform/economy` (still authoritative until the Phase 3 client swap) | own service — wallet/ledger/market | Yes — money/items seam for all games | `contract_economy_service` + `vision_economy` — **settled** | **[2026-07-22] pulled FORWARD** from Phase 8 into the current extraction alongside auth — repo exists, Phase 2 scaffold underway |
 | **inventory / item-registry** | **item-registry** (candidate) | `pkg:upsilonhub/internal/platform/inventory` | own service (or stays in hub) — the shared **item vocabulary** | **Yes — producers (tycoon) + consumers (battle) both depend on it** | own pair | [arch] vocabulary; [2026-07-22] candidate own service |
 | **effects** | **effects** (one project) | not built | own service; internal components: **generators / validators / upgraders-editors / recovery** | **Yes — the typed effects vocabulary bridges tycoon/digital producers ↔ battle/world consumers** | **one** pair for the whole effects project (components are internal) | [arch] vocabulary; [2026-07-22] one project, Bastien |
 | **character** | **character** (candidate) | `pkg:upsilonhub/internal/platform/character` | own service (provisional; ref by UUID, avoid new joins) | Medium | own pair | [arch] Phase 9, unscheduled |
@@ -129,10 +130,16 @@ flowchart LR
 Each project below must carry **exactly one CONTRACT + one VISION** atom, settled before its
 business atoms. Plus the platform-level top atoms from the architecture §11.
 
-- **Platform top atoms** (in `upsilonhub` as the registered project): `vision_platform_v3`,
-  `contract_game_composition` (the "games never import games" rule).
-- **Per project (each its own single pair):** upsilonhub, upsilonauth, economy, item-registry,
-  effects, character, world, contracts, battle, tycoon, spy, digital, upsilonapi.
+- **Platform top atoms — settled 2026-07-22 (no longer missing).** `contract_game_composition`
+  (the "games never import games" rule) + `vision_platform_v3` now exist in `upsilonhub/docs/`
+  (previously the gap flagged during extraction planning: "`upsilonhub/docs/` is empty").
+  `upsilonhub` is the registered ATD project hosting these plus all platform-domain atoms not
+  yet split into their own project.
+- **Per project (each its own single pair):** upsilonhub (settled, above), upsilonauth
+  (settled — `contract_auth_service`/`vision_auth`), upsiloneconomy (settled —
+  `contract_economy_service`/`vision_economy`), upsilonplatform (settled —
+  `contract_platform_kit`/`vision_platform_kit`), item-registry, effects, character, world,
+  contracts, battle, tycoon, spy, digital, upsilonapi.
 - The architecture §11 also lists per-domain VISION atoms (`vision_world`, `vision_tycoon`, …) —
   those are the VISION half of each project's pair.
 
@@ -144,5 +151,9 @@ business atoms. Plus the platform-level top atoms from the architecture §11.
    settled.)
 2. **contracts & world** — sub-projects of a platform project, or their own pairs? Leaning own pairs.
 3. **Admin API** — stays a hub responsibility (recommended) or its own service later.
-4. **Platform-wide OTel** — no atom/step/issue owns instrumenting `upsilonapi` + future services
-   yet; make it an explicit v3 roadmap line or a filed issue (only `upsilonhub` is instrumented).
+4. **Platform-wide OTel** — **[2026-07-22 update]** `upsilonauth` and `upsiloneconomy` are
+   **born instrumented**: the `upsilonplatform` kit's `observability` package (otelgin/otelpgx
+   setup) and `httpx` (W3C traceparent propagation on S2S calls) come for free at scaffold
+   time, no separate instrumentation step needed. `upsilonapi` remains the actual gap — no
+   atom/step/issue owns instrumenting it yet; make it an explicit v3 roadmap line or a filed
+   issue.

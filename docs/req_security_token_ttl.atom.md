@@ -10,9 +10,9 @@ tags: [auth, sanctum, security]
 parents:
   - [[req_security]]
 dependents:
+  - [[upsilonbattle:mech_sanctum_token_renewal]]
   - [[upsilonbattleui:mechanic_frontend_auth_bridge]]
   - [[upsilonbattleui:req_ui_session_timeout]]
-  - [[upsilonbattle:mech_sanctum_token_renewal]]
 ---
 # Token TTL Requirement
 

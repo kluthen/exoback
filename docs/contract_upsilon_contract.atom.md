@@ -9,15 +9,19 @@ human_name: Upsilon Hub Contract
 type: CONTRACT
 layer: BUSINESS
 dependents:
-  - [[upsilonbattleui:contract_ui_contract]]
   - [[rule_code_health_monitoring]]
   - [[rule_dto_strict_typing]]
   - [[upsilonapi:contract_api_contract]]
+  - [[upsilonauth:contract_auth_service]]
   - [[upsilonbattle:contract_battle_contract]]
   - [[upsilonbattle:rule_ruler_test_robustness]]
+  - [[upsilonbattleui:contract_ui_contract]]
   - [[upsiloncli:contract_cli_contract]]
+  - [[upsiloneconomy:contract_economy_service]]
+  - [[upsilonhub:contract_game_composition]]
   - [[upsilonmapdata:contract_mapdata_contract]]
   - [[upsilonmapmaker:contract_mapmaker_contract]]
+  - [[upsilonplatform:contract_platform_kit]]
   - [[upsilontools:contract_tools_contract]]
   - [[upsilontypes:contract_types_contract]]
 ---

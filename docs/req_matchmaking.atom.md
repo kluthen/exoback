@@ -10,8 +10,8 @@ tags: []
 parents:
   - [[shared:req_tech_debt_backlog]]
 dependents:
-  - [[upsilonbattleui:ui_waiting_room]]
   - [[upsilonbattle:mech_matchmaking]]
+  - [[upsilonbattleui:ui_waiting_room]]
 ---
 # Matchmaking Flow Requirement
 

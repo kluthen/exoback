@@ -63,6 +63,91 @@ services:
       hub-seed:
         condition: service_completed_successfully
 
+  # --- upsilonauth (:8091) — dark until the Phase-4 Caddy cutover ------------
+  auth-migrate:
+    build:
+      context: .
+      dockerfile: ./upsilonauth/Dockerfile
+    command: [ "-migrate" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  auth-seed:
+    build:
+      context: .
+      dockerfile: ./upsilonauth/Dockerfile
+    command: [ "-seed" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
+    env_file:
+      - .env # ADMIN_INITIAL_PASSWORD gates the admin seed block
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+
+  auth:
+    build:
+      context: .
+      dockerfile: ./upsilonauth/Dockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
+      - APP_DEBUG=true
+      - S2S_TOKEN=ci-internal-token
+    depends_on:
+      auth-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      # Distroless image (no shell): the binary probes its own /up route.
+      test: [ "CMD", "/app/upsilonauth", "-healthcheck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- upsiloneconomy (:8092) — internal-only, dark until the Phase-3 swap ---
+  economy-migrate:
+    build:
+      context: .
+      dockerfile: ./upsiloneconomy/Dockerfile
+    command: [ "-migrate" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsiloneconomy?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  economy-seed:
+    build:
+      context: .
+      dockerfile: ./upsiloneconomy/Dockerfile
+    command: [ "-seed" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsiloneconomy?sslmode=disable
+    depends_on:
+      economy-migrate:
+        condition: service_completed_successfully
+
+  economy:
+    build:
+      context: .
+      dockerfile: ./upsiloneconomy/Dockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsiloneconomy?sslmode=disable
+      - APP_DEBUG=true
+      - S2S_TOKEN=ci-internal-token
+    depends_on:
+      economy-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "/app/upsiloneconomy", "-healthcheck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   proxy:
     image: caddy:2-alpine
     environment:

@@ -167,6 +167,9 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 
 | Name | Date | Status | Severity | Oneliner |
 |---|---|---|---|---|
+| [upsilonapi default branch carries 15 Dependabot vulnerabilities (7 critical)](issues/Ref_20260722_upsilonapi_dependabot_vulns.md) | 2026-07-22 | Open | High | On pushing to `ecumeurs/upsilonapi` (2026-07-22, go.work-sync dependency comm... |
+| [Four match-resolution E2E scenarios race engine game-start and fail on dev machines](issues/Ref_20260722_match_start_race_local_env.md) | 2026-07-22 | Open | Low | The four scenarios act on a match immediately after the SSE `match.found` eve... |
+| [GDPR export loses per-game data coverage under the game-agnostic account model](issues/Ref_20260722_gdpr_export_per_game_gap.md) | 2026-07-22 | Open | Medium | Under the 2026-07-22 remodel, upsilonauth's `GET /auth/export` returns accoun... |
 | [Admin User Registry Leaks `full_address`/`birth_date` in Plaintext](issues/ISS-116_20260712_admin_users_endpoint_leaks_private_fields.md) | 2026-07-12 | Open | Medium | `rule_admin_access_restriction` (`upsilonapi`) documents: *"Administrators MU... |
 | [CLI HTTP Client Unconditionally Injects Request ID — "Missing Request ID" Path Untestable via E2E](issues/ISS-115_20260711_cli_client_cannot_omit_request_id.md) | 2026-07-11 | Open | Low | `upsiloncli`'s HTTP client (`Client.Do` in `upsiloncli/internal/api/client.go... |
 | [Character Reroll Has No Post-Match Gate — Documented "Creation Flow Only" Availability Rule Is Unenforced](issues/ISS-113_20260710_reroll_no_post_match_gate.md) | 2026-07-10 | Open | Medium | `upsilonbattle/docs/mech_character_reroll.atom.md` — the atom the `reroll` ha... |

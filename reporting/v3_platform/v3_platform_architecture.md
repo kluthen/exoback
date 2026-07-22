@@ -259,6 +259,19 @@ factory every second doesn't scale and drifts); instead:
 
 ## 8. Data architecture
 
+> **Amendment (2026-07-22) — superseded in part.** Extracted services get their **own
+> database**, not a shared-instance schema: `upsilon` (hub), `upsilonauth`, `upsiloneconomy` —
+> one database per service on the shared Postgres instance, each with its own
+> `DATABASE_URL`, relocatable to a dedicated instance later with no SQL changes (see
+> `how_to_add_a_service.md` §4). This *strengthens* the same discipline stated below rather
+> than replacing it: cross-service references remain **UUID-only**, no cross-service foreign
+> keys or joins, ownership checks still go through the owning interface — the boundary is just
+> physically harder (a different database, not just a different schema in one database) and
+> the extraction unit is now a database, not a schema. **"One schema per domain" remains the
+> intra-hub discipline** for domains not yet extracted (character, inventory, world,
+> contracts, and the game modules) — read the original text below with that scope narrowed
+> to "still inside `upsilonhub`".
+
 **One PostgreSQL, one schema per domain** (`identity.*`, `character.*`, `economy.*`,
 `inventory.*`, `world.*`, `contracts.*`, `battle.*`, `tycoon.*`, `spy.*`, `digital.*`).
 

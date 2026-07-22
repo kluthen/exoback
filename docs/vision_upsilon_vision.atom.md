@@ -5,12 +5,16 @@ human_name: Upsilon Hub Vision
 priority: 1
 tags: [governance, vision, root]
 dependents:
-  - [[upsilonbattleui:vision_ui_vision]]
   - [[upsilonapi:vision_api_vision]]
+  - [[upsilonauth:vision_auth]]
   - [[upsilonbattle:vision_battle_vision]]
+  - [[upsilonbattleui:vision_ui_vision]]
   - [[upsiloncli:vision_cli_vision]]
+  - [[upsiloneconomy:vision_economy]]
+  - [[upsilonhub:vision_platform_v3]]
   - [[upsilonmapdata:vision_mapdata_vision]]
   - [[upsilonmapmaker:vision_mapmaker_vision]]
+  - [[upsilonplatform:vision_platform_kit]]
   - [[upsilontools:mechanic_math_core_utils]]
   - [[upsilontools:mechanic_randomization_helpers]]
   - [[upsilontools:mechanic_spatial_distance_calculations]]

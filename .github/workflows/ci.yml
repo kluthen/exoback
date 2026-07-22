@@ -46,12 +46,22 @@ jobs:
       - name: Build Upsilon Hub
         run: go build -o /dev/null ./upsilonhub/cmd/upsilonhub
 
+      - name: Build Upsilon Auth
+        run: go build -o /dev/null ./upsilonauth/cmd/upsilonauth
+
+      - name: Build Upsilon Economy
+        run: go build -o /dev/null ./upsiloneconomy/cmd/upsiloneconomy
+
       - name: Verify Dockerfiles
         run: |
           echo "Checking upsilonhub Dockerfile..."
           docker build --check -f upsilonhub/Dockerfile . 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
           echo "Checking upsilonapi Dockerfile..."
           docker build --check -f upsilonapi/Dockerfile . 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
+          echo "Checking upsilonauth Dockerfile..."
+          docker build --check -f upsilonauth/Dockerfile . 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
+          echo "Checking upsiloneconomy Dockerfile..."
+          docker build --check -f upsiloneconomy/Dockerfile . 2>/dev/null || echo "Docker --check not supported, skipping syntax validation"
 
       - name: Generate Build Report
         if: always()
@@ -213,6 +223,10 @@ jobs:
           docker compose -f docker-compose.ci.yaml logs engine > ci_logs/engine.log 2>&1
           docker compose -f docker-compose.ci.yaml logs db > ci_logs/db.log 2>&1
           docker compose -f docker-compose.ci.yaml logs tester > ci_logs/tester.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs auth-migrate auth-seed > ci_logs/auth-init.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs auth > ci_logs/auth.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs economy-migrate economy-seed > ci_logs/economy-init.log 2>&1
+          docker compose -f docker-compose.ci.yaml logs economy > ci_logs/economy.log 2>&1
 
       - name: Upload Test Artifacts
         if: always()

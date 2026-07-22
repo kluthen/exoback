@@ -9,7 +9,6 @@ priority: 3
 tags: [tech-debt, escape-hatch, governance]
 parents: []
 dependents:
-  - [[upsilonbattleui:ui_leaderboard]]
   - [[req_matchmaking]]
   - [[req_security]]
   - [[us_character_reroll]]
@@ -25,6 +24,7 @@ dependents:
   - [[upsilonbattle:module_game]]
   - [[upsilonbattle:rule_credit_action_communication_layer]]
   - [[upsilonbattle:rule_skill_grading_system]]
+  - [[upsilonbattleui:ui_leaderboard]]
   - [[upsiloncli:script_farm]]
   - [[upsilontypes:entity_character]]
   - [[upsilontypes:entity_skill_template]]
