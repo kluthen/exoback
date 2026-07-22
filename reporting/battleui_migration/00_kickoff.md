@@ -2,7 +2,7 @@
 
 > **Start here.** This is the condensed, decision-final entry point for executing the
 > battleui → Go migration. Full analysis: docs 01–06 in this folder. Platform context and
-> decision ledger: [`../v3_platform_architecture.md`](../v3_platform_architecture.md) (§10).
+> decision ledger: [`../v3_platform/v3_platform_architecture.md`](../v3_platform/v3_platform_architecture.md) (§10).
 > All decisions below were made by Bastien on 2026-07-04.
 
 ## What we are building

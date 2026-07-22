@@ -5,7 +5,7 @@ the decision ledger; only the §10 "still open" items remain undecided)
 **Scope:** the four-game platform, seeded — playable vertical slices of each game wired
 through the shared world, not four finished games. **MQ is explicitly post-v3.0**; everything
 here runs on HTTP + an in-process event bus, structured so the MQ swap later is bounded
-(see `battleui_migration/06_v3_platform_constraints.md` §2.1–2.2, which this doc builds on).
+(see `06_v3_platform_constraints.md` §2.1–2.2, which this doc builds on).
 
 ## 1. The four games and how they interlock
 

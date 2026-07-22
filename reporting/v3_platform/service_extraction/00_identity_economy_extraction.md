@@ -23,7 +23,7 @@ These phases are **not orphaned** — the v3.0 platform roadmap already absorbs
 the important one:
 
 - **Phase 7 (Identity extraction) → v3.0 step "V3-1a Auth extraction"**
-  (`reporting/v3_platform_architecture.md`): promote identity to a standalone
+  (`reporting/v3_platform/v3_platform_architecture.md`): promote identity to a standalone
   `upsilonauth` service; the hub's identity package becomes its client; it is
   the SSO seam that landing, admin, and future game apps all trust. Phase 7's
   content is that step, resequenced.
@@ -31,7 +31,7 @@ the important one:
   matters near-term. Extract when independent ownership/scale actually justifies
   the network hop.
 - **Phase 9 (Characters/Profile)** remains an unscheduled candidate
-  (`reporting/battleui_migration/06_v3_platform_constraints.md` §2.3).
+  (`reporting/v3_platform/06_v3_platform_constraints.md` §2.3).
 
 ## Guiding principle (verbatim from the strategy doc)
 
@@ -98,7 +98,7 @@ a wallet** owned here.
 ## Phase 9 (candidate, unscheduled) — Extract Characters/Profile service
 
 The `CharacterService` seam from Phase 1 is the preparation; extraction is a
-v3.0-era decision. See `reporting/battleui_migration/06_v3_platform_constraints.md`
+v3.0-era decision. See `reporting/v3_platform/06_v3_platform_constraints.md`
 §2.3. Hub ownership of `characters` is **provisional** — reference characters by
 UUID and avoid new joins into `characters` to keep this option open.
 

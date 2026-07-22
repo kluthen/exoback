@@ -19,3 +19,4 @@ go-test-results.json
 php-test-results.txt
 bin/
 docker-compose.override.yaml
+.zcode/

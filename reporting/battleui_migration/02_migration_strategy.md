@@ -41,7 +41,7 @@ no second container, no Pusher**. This is the structural win.
 ### Package layout & the communication seam (v3.0 constraint — see doc 06)
 
 Structure the binary as **domain packages behind interfaces** — per the platform architecture
-(`reporting/v3_platform_architecture.md` §9, which supersedes this section on layout naming):
+(`reporting/v3_platform/v3_platform_architecture.md` §9, which supersedes this section on layout naming):
 `internal/platform/{identity,character,economy,inventory,…}` + `internal/games/battle/…` +
 `internal/gateway` + `internal/events` — with **all transport implementations in a dedicated
 layer** (`internal/transport/…`): the typed `upsilonapi` HTTP client, future clients
@@ -145,7 +145,7 @@ cache. (The per-login `ws_channel_key` rotation may retire with the SSE decision
 > **Phases 7 (Extract Identity), 8 (Extract Economy), and the Phase 9 candidate
 > (Characters/Profile), plus the post-extraction data-ownership boundary, have
 > been relocated for safe keeping to
-> `reporting/service_extraction/00_identity_economy_extraction.md`.** They were
+> `reporting/v3_platform/service_extraction/00_identity_economy_extraction.md`.** They were
 > never part of the port (Phases 0–6, all done) — they are post-migration
 > service decomposition along the `IdentityService`/`EconomyService` seams, and
 > Phase 7 is already absorbed into the v3.0 roadmap as "V3-1a Auth extraction".
@@ -163,7 +163,7 @@ cache. (The per-login `ws_channel_key` rotation may retire with the SSE decision
 | 6 Cutover | S | Ops/runbook, data continuity (same DB → low) |
 
 > Effort/risk for the extraction phases (7 Identity, 8 Economy) moved with them to
-> `reporting/service_extraction/00_identity_economy_extraction.md`.
+> `reporting/v3_platform/service_extraction/00_identity_economy_extraction.md`.
 
 **Lowest risk:** DB schema (port verbatim), engine bridge (gets *better* with shared types).
 **Highest risk:** WebSocket transport choice and matchmaking/resurrection logic.
