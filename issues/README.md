@@ -10,6 +10,7 @@
 
 | Ref | File | Severity | Status | Summary |
 |---|---|---|---|---|
+| ISS-121 | [ISS-121_20260723_baseline_player_stats_not_idempotent.md](ISS-121_20260723_baseline_player_stats_not_idempotent.md) | High | Resolved | Migration 000004_player_stats's CREATE TABLE has no IF NOT EXISTS — database.Baseline() replaying migrations against an already-migrated DB fails outright; breaks TestBaselineAdoptsLaravelMigratedDatabase and any retried Phase-4 cutover deploy |
 | ISS-120 | [ISS-120_20260722_internal_request_id_mandatory.md](ISS-120_20260722_internal_request_id_mandatory.md) | High | Open | Internal S2S calls ship an empty request_id — the hub never propagates its inbound X-Request-ID into httpx and durable jobs mint none; correlation id is mandatory (adopt-then-propagate, mint at origin). Gate before Phase-4 internal chains |
 | ISS-119 | [Ref_20260722_match_start_race_local_env.md](Ref_20260722_match_start_race_local_env.md) | Low | Open | Four match-resolution E2E scenarios act on match.found before the engine's async game-start lands — deterministic local failure (pre-existing, verified on pristine pre-session tree), unobserved on CI runners |
 | ISS-118 | [Ref_20260722_gdpr_export_per_game_gap.md](Ref_20260722_gdpr_export_per_game_gap.md) | Medium | Open | Game-agnostic accounts remodel narrows auth's GDPR export to account+registrations; per-game export fragments needed before the Phase-4 cutover leaves data portability incomplete |

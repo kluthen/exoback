@@ -145,6 +145,21 @@ Design is locked → fan out. Wave 1 parallel, then Wave 2.
   handlers + routes; upsiloncli register→enroll→play bootstrapBot + scenarios; new edge cases
   (auth-outage 401 parity, economy-outage, award-replay-after-restart).
 
+### Wave-1 landed notes (2026-07-23)
+
+- **Agent A (branch `phase4-player-stats`, hub, uncommitted):** migration 000004 (verified applying
+  on a real testcontainer PG18), 7 SQL sites retargeted with output columns kept stable via
+  `u.user_id AS id/player_id` aliasing, sqlc regen, mechanical `pg.go` fallout
+  (`UpdatePlayerStatsParams.ID`→`UserID`, `Timestamp`→`Timestamptz`). Both subtleties handled
+  (zombie-queue keyed off player_stats enrollment; leaderboard preserves no-deleted_at-filter).
+  battle+character tests + build + vet green.
+  - **INTEGRATION BLOCKER for Wave 2:** the shared gateway test fixture `createUser`
+    (`internal/gateway/authenv_test.go:215-223`) inserts only into `users`, never `player_stats`,
+    so post-retarget the docker-backed `internal/gateway/...` suite fails widely (joins find no
+    stats row). Expected — player_stats' sync sources (enroll / AccountPush / match-resolution /
+    reroll) don't exist yet. Wave 2 MUST update `createUser` to also create a `player_stats` row
+    (or route it through the new enroll path) so the gateway suite goes green again.
+
 **Integration (me):** reconcile handler deletions (B/C/D touch overlapping router wiring), boot
 the CI stack, verify register→enroll→play end-to-end, then bump pointers. Land ISS-118 before
 final prod cutover.
