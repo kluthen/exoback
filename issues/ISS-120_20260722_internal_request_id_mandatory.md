@@ -4,7 +4,7 @@
 **Ref:** `ISS-120`
 **Date:** 2026-07-22
 **Severity:** High
-**Status:** Open
+**Status:** Fixed & CI-verified — unit+integration green across 4 repos; 6-image stack scenario suite 33/37 (the 4 = pre-existing ISS-119 race + privacy flakes, zero request_id rejections in cross-service logs)
 **Component:** `upsilonplatform/httpx/httpx.go`
 **Affects:** `upsilonhub/internal/transport/economyclient`, `upsilonhub/internal/transport/authclient` (Phase 4), `upsilonhub/internal/awards`, `upsiloneconomy/internal/api`, every future internal service chain
 
@@ -77,6 +77,26 @@ The empty id is also what first manifested as a functional bug: `upsiloneconomy`
 Discovered 2026-07-22 during the Phase-3 economy-swap finish: the empty id surfaced first as awards 422 / shop-create 500 (economy unwrap bailing on empty id), fixed defensively in `upsiloneconomy` `ba61a64`. Confirmed the hub has zero `httpx.ContextWithRequestID` usages, so the id is dropped on every internal call. OTel `trace_id` continuity confirmed present on sync hops (httpx otelhttp transport) but the durable award path is not trace-linked to its settlement.
 
 ---
+
+## Resolution (2026-07-23, branch `iss-120-mandatory-request-id` on all four repos)
+
+Adopt-then-propagate + central mint + reject-empty, baked into the platform kit so eliding the id is structurally hard:
+
+**Senders always populate (never empty):**
+- `upsilonplatform/httpx` — `do()` now calls `ensureRequestID(ctx)` (context.go) once per call, minting a UUIDv7 when the ctx carries none, so the envelope body and the `X-Request-ID` header always share the SAME non-empty id.
+- `upsilonplatform/middleware.Envelope` — after resolving the id it injects it onto `c.Request`'s stdlib context via `httpx.ContextWithRequestID`, so EVERY gateway handler's `c.Request.Context()` auto-propagates the inbound id to its outbound S2S calls, no per-handler threading. (Fixes the root gap: gin's context value never reached `context.Context`.)
+- `upsilonhub/internal/awards` — `Args` gains `RequestID`; `resolveRequestID` adopts the settlement ctx's id on enqueue (mints only for a genuinely origin-less enqueue); `Worker.Work` restores it onto the drain context. The async award now correlates to its settlement across the durable-job boundary.
+
+**Receivers reject empty (crash-early — Bastien chose "tighten now"):**
+- New shared `upsilonplatform/middleware.RequireRequestID()` + `CallerRequestID()` (header-only, unambiguous — does not read the gin context key which `respond.RequestID` also fills with a generated id). Mounted on `upsilonauth`'s `/internal/v1` group.
+- `upsiloneconomy/internal/api.Envelope` rejects an internal call with no caller id (400) before generating one. The defensive unwrap-on-`data`-key (`ba61a64`) stays as belt-and-suspenders.
+
+**Tests (test-first):** httpx mint-when-absent (POST body==header id, GET header); middleware adopt + mint into outbound ctx; RequireRequestID accept/reject; economy + auth internal reject-missing-id (400); awards resolve/adopt/mint + Worker propagates. All green; `go vet` clean; `code_health_check.py` errors 0.
+
+**Deliberately deferred (follow-ups, not blocking):**
+- OTel **trace-context** across the River job boundary (issue's medium-term; request_id correlation is done, trace propagation across jobs is a larger River-middleware piece).
+- ISS-115 (`upsiloncli` unconditional mint) — under adopt-then-propagate the CLI is a true origin, so minting is correct; remains a Low testability gap only.
+- Pre-existing CONTRACT-as-`@spec-link` debt across the kit (see ATD memory) and `api_request_id` atom relocation out of `upsilonapi` — separate cleanup.
 
 ## References
 
