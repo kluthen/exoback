@@ -53,7 +53,7 @@ Pre-extraction, one process owned all tables, so one export query covered everyt
 
 **Medium term:** Each service exposes an internal export fragment (`GET /internal/v1/gdpr/export/{user_id}` on economy and on each game); auth's export composes the fragments of the services the account is registered to (it already knows the registration list).
 
-**Long term:** Make the export fragment part of the "how to add a service" checklist — a service that stores personal data MUST ship its fragment endpoint before going live (add to `reporting/v3_platform/how_to_add_a_service.md` §7/§0 gates).
+**Long term:** Make the export fragment part of the "how to add a service" checklist — a service that stores personal data MUST ship its fragment endpoint before going live (add to `architecture/how_to_add_a_service.md` §7/§0 gates).
 
 ---
 
@@ -66,5 +66,5 @@ Born from the 2026-07-22 game-agnostic accounts remodel (auth = account+registra
 ## References
 
 - `upsilonauth/docs/contract_auth_service.atom.md` (GDPR clause)
-- `reporting/v3_platform/how_to_add_a_service.md`
+- `architecture/how_to_add_a_service.md`
 - `issues/Ref_20260722_upsilonapi_dependabot_vulns.md` (same session's security pass)

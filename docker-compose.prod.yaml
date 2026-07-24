@@ -13,8 +13,8 @@
 # already-applied) is intentionally NOT used here — it would mark 000001 as
 # applied *without running it* on an empty DB, then 000002 would ALTER a table
 # that was never created. Only use baseline against a DB that already carries
-# the Laravel schema. The baseline path + adoption runbook are preserved in
-# reporting/battleui_migration/08_phase6_cutover_report.md for reference.
+# the Laravel schema. The adoption/cutover runbook is preserved in
+# architecture/prod_cutover_runbook.md for reference.
 
 name: upsilon-prod
 

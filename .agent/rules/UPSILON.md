@@ -15,8 +15,8 @@ The platform is on the **v3.0** trajectory: a four-game world (battle, tycoon, s
 composition. Today the platform substrates and game modules live as packages **inside the hub**
 (`internal/platform/…`, `internal/games/…`), each an extraction candidate with the seam already
 drawn. For the service→project ownership map, bridge topology, and contract/vision attribution, see
-[`reporting/v3_platform/service_map.md`](../../reporting/v3_platform/service_map.md); current-state
-shape is [`reporting/architecture_anchor.md`](../../reporting/architecture_anchor.md).
+[`architecture/service_map.md`](../../architecture/service_map.md); current-state
+shape is [`architecture/architecture_anchor.md`](../../architecture/architecture_anchor.md).
 
 ## 2. Who's Who (Service Architecture)
 

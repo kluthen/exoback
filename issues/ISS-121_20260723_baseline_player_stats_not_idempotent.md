@@ -95,4 +95,4 @@ Medium/long-term recommendations (a migration-idempotency lint, and an explicit 
 - `db/migrations/000004_player_stats.down.sql`
 - `internal/testutil/schema_test.go`
 - `internal/platform/playerstats/queries.sql` (the `ON CONFLICT DO NOTHING` pattern this fix should mirror)
-- `reporting/v3_platform/service_extraction/03_phase4_auth_cutover_design.md` §3 (player_stats backfill design)
+- hub migration `000004_player_stats` (the player_stats backfill this fix makes idempotent)

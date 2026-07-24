@@ -3,7 +3,7 @@
 # cutover_extraction.sh — one-shot adoption of a single-DB (pre-extraction) hub
 # deployment into the v3 per-service topology: auth (upsilonauth), economy
 # (upsiloneconomy) and the slimmed hub, each on its own database on the SAME
-# Postgres instance. See reporting/v3_platform/service_extraction/01_prod_cutover_runbook.md
+# Postgres instance. See architecture/prod_cutover_runbook.md
 # for the full procedure, invariants and rollback.
 #
 # THIS SCRIPT IS DESTRUCTIVE and is GUARDED on purpose:

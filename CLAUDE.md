@@ -37,7 +37,7 @@ Post–Phase 6 the Laravel `battleui` and its Reverb WebSockets are **decommissi
 - `games/` — game modules; today `battle`. **Games never import games** (cross-game flow via platform state, shared vocabularies, or the event bus).
 - `gateway/` (HTTP surface + SSE + SPA), `events/` (domain event bus), `transport/`, `observability/` (OTel), `database/`, `seed/`, `config/`, `testutil/`.
 
-The four-game v3.0 trajectory (battle/tycoon/spy/digital), service→project ownership, and contract/vision attribution live in [`reporting/v3_platform/service_map.md`](reporting/v3_platform/service_map.md).
+The four-game v3.0 trajectory (battle/tycoon/spy/digital), service→project ownership, and contract/vision attribution live in [`architecture/service_map.md`](architecture/service_map.md).
 
 ## 2. Development Governance ([ATD.md](.agent/rules/ATD.md))
 **CORE WORKFLOW.**

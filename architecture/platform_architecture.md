@@ -454,7 +454,7 @@ The table as approved:
 | `battleui` | Laravel + Vue today | Vue app migrates into `upsilonhub`; repo archived at Phase 6 cutover |
 | `upsilonapi`, `upsilonbattle`, `upsilontypes`, `upsilonserializer`, `upsilonmapdata`, `upsilonmapmaker`, `upsilontools`, `upsilonaws` | Unchanged roles | Stay as-is; `upsilontypes` gains the shared contract structs (§5) |
 | `upsiloncli` | Scripting/E2E harness | Stays; grows per-domain generated clients (§13.4) |
-| **`upsilon-hub`** (this umbrella) | Submodule aggregator, `go.work`, `.atd.workspace`, `reporting/`, issues | Stays the umbrella; gains the `upsilonhub` submodule |
+| **`upsilon-hub`** (this umbrella) | Submodule aggregator, `go.work`, `.atd.workspace`, `architecture/`, issues | Stays the umbrella; gains the `upsilonhub` submodule |
 
 Splitting the frontend into its own repo is possible later; keeping it inside `upsilonhub`
 minimizes moving parts during the migration. Whether per-game modules ever get their own
