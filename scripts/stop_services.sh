@@ -3,7 +3,10 @@ cd "$(dirname "$0")/.."
 
 # Configuration
 PID_FILE=".services.pids"
-PORTS=(8090 5173 8081)
+# 8092 (economy, Phase 3) and 8091 (auth, Phase 4) were missing from forceful
+# cleanup — graceful PID-file stop covered them, but a stuck process on either
+# port survived past that step. Added so a bad restart can't wedge either seam.
+PORTS=(8090 5173 8081 8092 8091)
 
 echo "---------------------------------------"
 echo "Stopping Upsilon Stack..."

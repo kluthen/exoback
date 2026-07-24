@@ -31,6 +31,13 @@ go build -o bin/upsiloneconomy ./cmd/upsiloneconomy
 cd ..
 
 echo "---------------------------------------"
+echo "Building Upsilon Auth..."
+echo "---------------------------------------"
+cd upsilonauth || exit
+go build -o bin/upsilonauth ./cmd/upsilonauth
+cd ..
+
+echo "---------------------------------------"
 echo "Building SPA (upsilonbattleui)..."
 echo "---------------------------------------"
 cd upsilonbattleui || exit

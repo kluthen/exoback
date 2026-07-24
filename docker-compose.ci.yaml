@@ -63,14 +63,21 @@ services:
       # to the extracted upsiloneconomy service over the internal S2S surface.
       # (Empty ECONOMY_INTERNAL_URL would keep the in-process rollback impl.)
       - ECONOMY_INTERNAL_URL=http://economy:8092
+      # Phase-4 auth cutover: token introspection goes to the extracted
+      # upsilonauth service. Hard cutover — no rollback flag (unlike economy).
+      - AUTH_INTERNAL_URL=http://auth:8091
       - S2S_TOKEN=ci-internal-token
     depends_on:
       hub-seed:
         condition: service_completed_successfully
       economy:
         condition: service_healthy
+      auth:
+        condition: service_healthy
 
-  # --- upsilonauth (:8091) — dark until the Phase-4 Caddy cutover ------------
+  # --- upsilonauth (:8091) — Phase-4 cutover: Caddy routes /api/v1/auth/* and
+  # /api/v1/admin/users* straight here; the hub reaches it over S2S for
+  # introspection and receives its AccountPush jobs on /internal/v1. ---------
   auth-migrate:
     build:
       context: .
@@ -102,6 +109,9 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
       - APP_DEBUG=true
+      # AccountPush producer (River job -> POST /internal/v1/players/:id/account)
+      # needs the hub's internal S2S surface to relay account lifecycle mutations.
+      - HUB_INTERNAL_URL=http://hub:8090
       - S2S_TOKEN=ci-internal-token
     depends_on:
       auth-seed:
@@ -159,12 +169,17 @@ services:
     image: caddy:2-alpine
     environment:
       - HUB_UPSTREAM=hub:8090
+      # Phase-4 auth cutover: /api/v1/auth/* and /api/v1/admin/users* go here.
+      - AUTH_UPSTREAM=auth:8091
     volumes:
       - ./upsilonhub/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
       - "8085:8085"
     depends_on:
-      - hub
+      hub:
+        condition: service_started
+      auth:
+        condition: service_healthy
     healthcheck:
       # Proves the whole chain: proxy → hub → /up liveness route.
       test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8085/up" ]

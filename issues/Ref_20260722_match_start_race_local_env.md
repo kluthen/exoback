@@ -1,4 +1,4 @@
-# Issue: Four match-resolution E2E scenarios race engine game-start and fail on dev machines
+# Issue: Five match-resolution E2E scenarios race engine game-start and fail on dev machines
 
 **ID:** `20260722_match_start_race_local_env`
 **Ref:** `ISS-119`
@@ -6,7 +6,7 @@
 **Severity:** Low
 **Status:** Open
 **Component:** `upsiloncli/tests/scenarios/` (match-resolution family)
-**Affects:** `e2e_battle_starts_privacy_check`, `e2e_match_resolution_forfeit`, `e2e_match_resolution_standard_with_2`, `e2e_progression_post_win_with_2`; local full-suite runs
+**Affects:** `e2e_battle_starts_privacy_check`, `e2e_match_resolution_forfeit`, `e2e_match_resolution_standard_with_2`, `e2e_progression_post_win_with_2`, `e2e_progression_constraints_with_2` (Bot-02, the loser, forfeits immediately after `match.found` → `game_forfeit: Game is not in progress`; surfaced in the 2026-07-23 Phase-4 E2E run); local full-suite runs
 
 ---
 
