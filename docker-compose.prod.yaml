@@ -2,12 +2,15 @@
 # Built for persistence, reliability, and automated orchestration.
 # Usage: ./scripts/setup_prod.sh && docker compose -f docker-compose.prod.yaml up -d --wait
 #
-# Post-cutover shape (Phase 6 §E): one hub image serves the API, SSE and the
-# SPA; db-init runs -migrate-mode full against a fresh database (the old prod DB
-# is wiped, not adopted — decision 2026-07-09), applying 000001 + 000002+ from
-# scratch. Caddy stays the front door, publishing the historical client port
-# 8000 — its healthcheck doubles as the hub's (the distroless hub image has no
-# shell for an in-container one).
+# Post-cutover shape (Phase 6 §E + Phase 4/5 auth/economy extraction): the hub
+# serves the API, SSE and the SPA, but token introspection and wallet/shop
+# reads go over the internal S2S surface to upsilonauth/upsiloneconomy — see
+# CODING_RULE.md and docker-compose.ci.yaml (the reference shape this mirrors).
+# db-init/auth-migrate/economy-migrate run -migrate(-mode full) against a fresh
+# database (the old prod DB is wiped, not adopted — decision 2026-07-09),
+# applying each service's schema from scratch. Caddy stays the front door,
+# publishing the historical client port 8000 — its healthcheck doubles as the
+# hub's (the distroless hub image has no shell for an in-container one).
 #
 # NOTE: -migrate-mode baseline (adopt a Laravel-migrated DB, stamp 000001 as
 # already-applied) is intentionally NOT used here — it would mark 000001 as
@@ -33,6 +36,9 @@ services:
       start_period: 30s
     volumes:
       - db_data:/var/lib/postgresql
+      # Per-service databases (upsilon, upsilonauth, upsiloneconomy) — only
+      # runs on first cluster init, i.e. a fresh db_data volume.
+      - ./deploy/initdb:/docker-entrypoint-initdb.d:ro
 
   db-init:
     build:
@@ -45,6 +51,17 @@ services:
     env_file:
       - .env
 
+  hub-seed:
+    build:
+      context: .
+      dockerfile: ./upsilonhub/Dockerfile
+    command: [ "-seed" ]
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+
   hub:
     build:
       context: .
@@ -52,21 +69,120 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db-init:
+      hub-seed:
         condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+      economy:
+        condition: service_healthy
     env_file:
       - .env
+
+  # --- upsilonauth (:8091) — Phase-4 cutover: Caddy routes /api/v1/auth/* and
+  # /api/v1/admin/users* straight here; the hub reaches it over S2S for
+  # introspection and receives its AccountPush jobs on /internal/v1. ---------
+  auth-migrate:
+    build:
+      context: .
+      dockerfile: ./upsilonauth/Dockerfile
+    command: [ "-migrate" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  auth-seed:
+    build:
+      context: .
+      dockerfile: ./upsilonauth/Dockerfile
+    command: [ "-seed" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
+    env_file:
+      - .env # ADMIN_INITIAL_PASSWORD gates the admin seed block
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+
+  auth:
+    build:
+      context: .
+      dockerfile: ./upsilonauth/Dockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsilonauth?sslmode=disable
+      # AccountPush producer (River job -> POST /internal/v1/players/:id/account)
+      # needs the hub's internal S2S surface to relay account lifecycle mutations.
+      - HUB_INTERNAL_URL=http://hub:8090
+    env_file:
+      - .env # APP_DEBUG, S2S_TOKEN
+    depends_on:
+      auth-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      # Distroless image (no shell): the binary probes its own /up route.
+      test: [ "CMD", "/app/upsilonauth", "-healthcheck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- upsiloneconomy (:8092) — internal-only, reached over S2S from the hub ---
+  economy-migrate:
+    build:
+      context: .
+      dockerfile: ./upsiloneconomy/Dockerfile
+    command: [ "-migrate" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsiloneconomy?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  economy-seed:
+    build:
+      context: .
+      dockerfile: ./upsiloneconomy/Dockerfile
+    command: [ "-seed" ]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsiloneconomy?sslmode=disable
+    depends_on:
+      economy-migrate:
+        condition: service_completed_successfully
+
+  economy:
+    build:
+      context: .
+      dockerfile: ./upsiloneconomy/Dockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/upsiloneconomy?sslmode=disable
+    env_file:
+      - .env # APP_DEBUG, S2S_TOKEN
+    depends_on:
+      economy-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "/app/upsiloneconomy", "-healthcheck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   proxy:
     image: caddy:2-alpine
     environment:
       - HUB_UPSTREAM=hub:8090
+      # Phase-4 auth cutover: /api/v1/auth/* and /api/v1/admin/users* go here.
+      - AUTH_UPSTREAM=auth:8091
     volumes:
       - ./upsilonhub/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
       - "8000:8085"
     depends_on:
-      - hub
+      hub:
+        condition: service_started
+      auth:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8085/up" ]
       interval: 5s

@@ -47,10 +47,14 @@ generate_secret() {
 
 echo "[+] Generating secure secrets..."
 
-# Admin seed password (hub -seed admin block)
+# Admin seed password (hub -seed / auth -seed admin block)
 ADMIN_INITIAL_PASSWORD=$(generate_secret)
 # Use ^ to anchor the replacement to the start of the key name to avoid substring collision
 sed -i "s|^ADMIN_INITIAL_PASSWORD=GENERATED_SECRET|ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD|g" "$ENV_FILE"
+
+# S2S token shared by hub/auth/economy for internal service-to-service calls
+S2S_TOKEN=$(generate_secret)
+sed -i "s|^S2S_TOKEN=GENERATED_SECRET|S2S_TOKEN=$S2S_TOKEN|g" "$ENV_FILE"
 
 echo "---------------------------------------"
 echo "[OK] Production environment initialized."
