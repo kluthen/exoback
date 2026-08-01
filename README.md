@@ -1,8 +1,8 @@
-# UpsilonBattle: Tactical RPG
+# Upsilon: A Multi-Service Game Platform
 
-**UpsilonBattle** is a simple, turn-based Tactical RPG (TRPG) designed for concurrent multiplayer combat and AI skirmishes. Designed entirely around the Atomic Documentation (ATD) framework, its concepts separates game logic, mechanics, and architectural boundaries into standalone, single-responsibility specifications.
+**Upsilon** is a multi-service game platform, umbrella-repo'd across Git submodules and governed end to end by the Atomic Traceable Documentation (ATD) framework. Today it ships one live game — **UpsilonBattle**, a turn-based Tactical RPG (TRPG) for concurrent multiplayer combat and AI skirmishes — served through a shared platform gateway (`upsilonhub`) alongside extracted substrate services for identity (`upsilonauth`) and economy (`upsiloneconomy`). The v3 trajectory grows this into a four-game platform (battle, tycoon, spy, digital) composed on shared platform substrates and vocabularies, with the standing rule that **games never import games** — see [`architecture/service_map.md`](architecture/service_map.md) and [`architecture/platform_architecture.md`](architecture/platform_architecture.md) for the full service ownership map and platform direction.
 
-## The Game At a Glance
+## Battle: The Game At a Glance
 - **Play Modes:** 1v1 (PvE or PvP) and 2v2 (PvE or PvP).
 - **The Board:** A randomly generated rectangular grid (5-15 tiles per dimension, absolute minimum area of 50 tiles) containing up to 10% randomly placed impassable obstacles.
 - **Victory Condition:** Eliminate all characters on the opposing team. **Friendly Fire is strictly disabled.**
@@ -21,36 +21,45 @@
 - **The Shot Clock:** Active combat turns mandate a strict **30-second limit** per character. Failing to confirm an action manually results in an auto-pass forced by the server, accompanied by a penalty of `+100` (Total `+400` delay).
 
 ## Modular Architecture
-The UpsilonBattle ecosystem is built as a modular multi-repo system. Each core component is maintained in its own repository and integrated into this main project as a formal **Git Submodule**.
+The Upsilon platform is built as a modular multi-repo system. Each core component is maintained in its own repository and integrated into this umbrella project as a formal **Git Submodule** (`upsilonserializer` is the one exception — an in-tree Go module, not a submodule).
 
 ### Repository Structure
 1. **Frontend (`upsilonbattleui`)**:
-   - Standalone Vue 3 + Vite SPA (vue-router, Tailwind CSS, TresJS 3D).
+   - Standalone Vue 3 + Vite SPA (vue-router, Tailwind CSS, TresJS 3D) — the player/battle client plus the admin pages.
    - Served by the hub; talks to `/api/v1` with bearer tokens and listens on the SSE event stream.
 
 2. **Platform Gateway (`upsilonhub`)**:
-   - Go service owning auth/identity, matchmaking, economy/loadout, admin, realtime SSE and the database schema.
+   - Go service — the platform gateway hosting the remaining platform substrates and game modules as packages (matchmaking, admin, character, realtime SSE, the database schema, and today's only shipped game module: battle).
    - One image serves the API + SPA, runs migrations (`-migrate-mode`) and seeds (`-seed`).
 
-3. **Backend API (`upsilonapi`)**:
-   - A high-performance Go JSON API.
-   - Handles account management, character statistics, and match state persistence.
+3. **Identity Service (`upsilonauth`)**:
+   - Extracted auth/identity substrate (SSO-bound target). Owns accounts, tokens, admin user registry and enrollment; the hub validates tokens against it over S2S.
 
-4. **Battle Engine (`upsilonbattle`)**:
+4. **Economy Service (`upsiloneconomy`)**:
+   - Extracted economy substrate — wallets, ledger, purchases/awards — consumed by the hub (and, over time, every game) over the internal S2S surface.
+
+5. **Platform Kit (`upsilonplatform`)**:
+   - Shared mechanical kit (envelope/`respond`, injected clock, observability/OTel setup, database, durable jobs, S2S `httpx`) that every extracted service composes on, so new services are born instrumented instead of copy-drifting the plumbing.
+
+6. **Backend API (`upsilonapi`)**:
+   - The battle engine's "Bridge" — a high-performance Go JSON API handling match state, engine callbacks and account/character statistics for the battle game.
+
+7. **Battle Engine (`upsilonbattle`)**:
    - The "calculating brain" that governs active combat sequences.
    - Mathematically simulates initiative, movement validation, and damage systems.
 
-5. **Journey Explorer CLI (`upsiloncli`)**:
+8. **Journey Explorer CLI (`upsiloncli`)**:
    - An interactive terminal tool for API exploration and verification.
    - Supports "Autopilot" sessions to simulate full player journeys.
 
-6. **Shared Assets & Utilities**:
+9. **Shared Assets & Utilities**:
    - `upsilonmapdata`: Geometric board data and obstacle definitions.
    - `upsilonmapmaker`: Procedural generation tools for game boards.
    - `upsilontools`: Common TRPG utilities and helper functions.
    - `upsilontypes`: Shared type definitions and domain models used across all modules.
+   - `upsilonserializer`: In-tree (non-submodule) Go module for engine-state serialization.
 
-7. **AWS Infrastructure (`upsilonaws`)**:
+10. **AWS Infrastructure (`upsilonaws`)**:
    - Bash-based provisioning scripts for deploying the full stack to AWS (eu-west-3).
    - Manages: VPC, EC2 (t3.medium), RDS PostgreSQL 15, Route 53 DNS, nginx + Let's Encrypt SSL.
    - Public endpoint: [upsilon-hub.com](https://upsilon-hub.com) — run `setup.sh` to provision, `teardown.sh` to wipe everything.
@@ -130,10 +139,10 @@ A single **CI Pipeline** runs three staged jobs on push / PR to `main`:
 ### Code Health Standards (`scripts/code_health_check.py`)
 Upsilon enforces strict maintainability standards across all supported languages (Go, Python, JS, Vue). These are verified locally via the pre-commit hook and in CI.
 
-- **File Length:** Maximum 300 LOC (Warning), 500 LOC (Error).
-- **Complexity:** Function nesting depth must not exceed 3 levels.
-- **Documentation:** Functions should have > 30% comment density (Warning) and > 50% (Error threshold for critical paths).
-- **ATD Traceability:** Each file must have 2-5 `@spec-link` tags. Under 2 or over 10 links results in an Error.
+- **File Length:** Warning above 400 effective LOC, Error above 600 LOC.
+- **Complexity:** Function nesting depth must not exceed 4 levels.
+- **Documentation:** Every function needs an intent comment; missing docs on exported functions is an Error.
+- **ATD Traceability:** Each file must have 1-10 `@spec-link`/`@test-link` tags (warn above 5). Under 1 or over 10 links results in an Error.
 - **Validity:** All `@spec-link` IDs must resolve to a valid ATD Atom in the `docs/` directory.
 
 **Exemptions:**
@@ -147,10 +156,12 @@ Individual checks can be bypassed using specific tags:
 The project utilizes a dedicated **[docker-compose.ci.yaml](docker-compose.ci.yaml)** to spin up an ephemeral testing environment. This stack is optimized for speed and reliability.
 
 - **Components:**
-  - `db`: Postgres 18-alpine database.
+  - `db`: Postgres 18-alpine database (per-service DBs: `upsilon`, `upsilonauth`, `upsiloneconomy`, on one shared Postgres instance).
   - `hub-migrate` / `hub-seed`: hub-image init containers (schema + seed).
-  - `hub`: the platform gateway serving API + SSE + SPA.
-  - `proxy`: Caddy front door on `:8085` (its healthcheck gates the stack).
+  - `hub`: the platform gateway serving API + SSE + SPA; reaches `auth`/`economy` over S2S.
+  - `auth-migrate` / `auth-seed` / `auth`: the extracted `upsilonauth` identity service.
+  - `economy-migrate` / `economy-seed` / `economy`: the extracted `upsiloneconomy` service.
+  - `proxy`: Caddy front door on `:8085` (its healthcheck gates the stack; routes `/api/v1/auth/*` and `/api/v1/admin/users*` straight to `auth`).
   - `engine`: The Upsilon Battle Engine (Go).
   - `tester`: The Upsilon CLI running in integration mode.
 - **Usage:**
