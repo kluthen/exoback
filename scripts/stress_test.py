@@ -4,8 +4,7 @@ Upsilon Battle Engine Stress Testing Tool.
 This script orchestrates multiple concurrent matches using bot scripts to stress
 the engine and monitor resource usage (CPU, Memory, FDs).
 
-@spec-link [[mechanic_mech_battle_engine_stress_testing]]
-@spec-link [[rule_code_health_monitoring]]
+@spec-link [[mechanic_battle_engine_stress_testing]]
 """
 import subprocess
 import time

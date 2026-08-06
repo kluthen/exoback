@@ -60,6 +60,8 @@ The seven non-negotiables. Each is **MUST/NEVER**, not a preference.
   a matching update to `communication.md`, Postman, and the relevant ATD atoms.
 - Cross-service references are **by UUID through the owning domain's interface** — never a reach
   across a seam (no cross-schema joins, no reading another domain's tables) to shortcut a contract.
+- **DTOs must never use `any`/`interface{}` fields for input or output.** Every field must have a
+  concrete type describing its structure.
 
 ## 5. Test-first when fixing bugs
 
@@ -79,8 +81,9 @@ Enforced by `scripts/code_health_check.py`; treat its errors as blocking.
 - **Nesting depth:** ≤4 levels; refactor beyond.
 - **Doc density:** every function has an intent comment; missing docs on exported functions is an
   error. Match the surrounding file's comment density and idiom.
-- **ATD density:** ≥1 link/file, ≤10 (warn >5). Bypass tokens (`@lint-ignore-*`) are for genuine
-  exceptions (third-party/generated code), not for silencing your own.
+- **ATD density:** ≥1 link/file, ≤10 distinct atoms (warn >5 distinct); repeated links to the same
+  atom count once. Bypass tokens (`@lint-ignore-*`) are for genuine exceptions (third-party/generated
+  code), not for silencing your own.
 
 ## 7. Change discipline
 

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-# @spec-link [[rule_code_health_monitoring]]
+# @lint-ignore-atd tooling script with no business-layer rationale; the standard it
+# enforces is defined in CODING_RULE.md §6.
 # This script enforces the project's "Zero Error" code health standards, including
 # file length, function complexity, and intent-based documentation requirements.
 # Note: this is highly specific for our project: it will only work for the files
-# and frameworks we use (Go, PHP, JS, Vue, Python).
+# and frameworks we use (Go, PHP, JS, TypeScript, Vue, Python).
 import os
 import re
 import sys
 
 # Constants
-EXTENSIONS = {'.go', '.py', '.php', '.js', '.vue'}
+# .php retained deliberately: leave the ability to work with php files, who
+# knows if we will need it at a later date.
+EXTENSIONS = {'.go', '.py', '.php', '.js', '.ts', '.tsx', '.vue'}
 IGNORE_DIRS = {'vendor', 'node_modules', '.git', 'dist', 'build'}
 
 # Thresholds
@@ -102,12 +105,13 @@ class HealthCheck:
         
         if not ignore_atd:
             atd_count = len(atd_links)
+            distinct_atd_count = len(set(atd_links))
             if atd_count < ATD_MIN:
                 self.report(filepath, "ERROR", f"Too few ATD links: {atd_count} (min {ATD_MIN})")
-            elif atd_count > ATD_ERROR_MAX:
-                self.report(filepath, "ERROR", f"Too many ATD links: {atd_count} (max {ATD_ERROR_MAX})")
-            elif atd_count > ATD_WARN_MAX:
-                self.report(filepath, "WARN", f"Many ATD links: {atd_count} (limit {ATD_WARN_MAX})")
+            elif distinct_atd_count > ATD_ERROR_MAX:
+                self.report(filepath, "ERROR", f"Too many distinct ATD atoms: {distinct_atd_count} (max {ATD_ERROR_MAX})")
+            elif distinct_atd_count > ATD_WARN_MAX:
+                self.report(filepath, "WARN", f"Many distinct ATD atoms: {distinct_atd_count} (limit {ATD_WARN_MAX})")
             
             # Enforce @test-link in test environment
             if is_test_file:

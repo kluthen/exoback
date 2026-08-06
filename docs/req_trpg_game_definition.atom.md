@@ -12,6 +12,9 @@ dependents:
   - [[mechanic_battle_engine_stress_testing]]
   - [[upsilonbattle:req_skill_generation]]
   - [[upsilonbattleui:ui_battle_arena]]
+  - [[upsilonmapdata:rule_mapdata_grid_standard]]
+  - [[upsilonmapmaker:rule_mapmaker_board_generation_constraints]]
+  - [[upsilonmapmaker:rule_mapmaker_seed_determinism]]
 human_name: TRPG Game Definition
 ---
 

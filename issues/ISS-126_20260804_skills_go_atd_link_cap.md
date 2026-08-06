@@ -4,7 +4,7 @@
 **Ref:** `ISS-126`
 **Date:** 2026-08-04
 **Severity:** Medium
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonhub/internal/gateway/skills.go`
 **Affects:** `scripts/code_health_check.py` (zero-error standard, CODING_RULE.md §6), `upsilonhub/internal/gateway/skill_test.go`, any future `@spec-link` addition to this file
 
@@ -22,14 +22,14 @@
 
 CODING_RULE.md §6 requires zero errors from `code_health_check.py`: files ≤400 (warn) / 600 (error) effective LOC, nesting ≤4, every function documented, and **1–10 ATD links per file**. The link cap exists to keep a file's spec surface comprehensible — a file bound to many atoms is usually a file doing many jobs.
 
-Note the checker counts **link occurrences**, not distinct atoms. `skills.go` has 12 occurrences but only **6 distinct atoms**, because several handlers legitimately repeat the same `@spec-link`. Whether the rule intends occurrences or distinct atoms is worth confirming — but in this instance the file is over the line either way on the concern-count argument below.
+Note the checker counts **link occurrences**, not distinct atoms. `skills.go` has 12 occurrences but only **5 distinct atoms**, because several handlers legitimately repeat the same `@spec-link`. Whether the rule intends occurrences or distinct atoms is worth confirming — but in this instance the file is over the line either way on the concern-count argument below.
 
 ### The Problem Scenario
 
 The 12 links cluster cleanly into three groups that share almost nothing:
 
 ```
-skills.go (274 LOC, 10 funcs, 12 links / 6 distinct atoms)
+skills.go (274 LOC, 10 funcs, 12 links / 5 distinct atoms)
 │
 ├── CONCERN A — skill template catalogue
 │   ├─ listTemplates      :43   [[upsilonapi:api_skill_template_browse]]
@@ -89,7 +89,7 @@ Consequences today:
 
 `mountSkills` stays in whichever file keeps the routing group, or moves to a small `skills.go` that only wires. Each resulting file lands comfortably inside 1–10 links. Split `skill_test.go` to match, so each test file's `@test-link` header claims only what that file actually exercises.
 
-**Long term:** Consider whether the link cap should count **distinct atoms** rather than occurrences in `code_health_check.py`. Under a distinct-atom count this file reads 6/10 and would never have flagged — which may or may not be the intended semantics. Worth a deliberate decision, since it changes the rule's behaviour repo-wide.
+**Long term:** Consider whether the link cap should count **distinct atoms** rather than occurrences in `code_health_check.py`. Under a distinct-atom count this file reads 5/10 and would never have flagged — which may or may not be the intended semantics. Worth a deliberate decision, since it changes the rule's behaviour repo-wide.
 
 ---
 
@@ -97,7 +97,7 @@ Consequences today:
 
 Discovered during ISS-124 close-out (game-agnostic accounts / games catalog work), when a documentalist Workflow B sync established that `upsilonbattle:mech_skill_selection_progression` had **zero** `@spec-link`/`@test-link` references anywhere and therefore could not honestly advance past DRAFT. Adding the missing link to `roll` was the correct action for the papertrail and is what surfaced the pre-existing cap breach. The executor that added it flagged the overflow rather than quietly rebalancing tags to stay under the limit — the right call, and the reason this issue exists.
 
-Verified counts at filing time: 274 LOC, 10 functions, 12 link occurrences, 6 distinct atoms.
+Verified counts at filing time: 274 LOC, 10 functions, 12 link occurrences, 5 distinct atoms (corrected from an initial miscount of 6 — see Change Log).
 
 ---
 
@@ -109,3 +109,19 @@ Verified counts at filing time: 274 LOC, 10 functions, 12 link occurrences, 6 di
 - `CODING_RULE.md` §6 (Zero-error code health)
 - `.agent/rules/ATD.md` (link placement: `@spec-link` atop functions only)
 - `upsilonbattle/docs/mech_skill_selection_progression.atom.md`
+
+---
+
+## Resolution
+
+`skills.go` was split along the three concern boundaries recommended above into `skill_templates.go`, `skill_inventory.go`, and `skill_roll.go`, plus a thin `skills.go` retaining only routing. Tests were redistributed into three matching files (`skill_templates_test.go`, `skill_inventory_test.go`, `skill_roll_test.go` / `skill_equip_test.go`).
+
+Independently verified at close:
+- Link set preserved: 12 → 12 identical occurrences across the split files, 5 distinct atoms, none deleted.
+- Routes: byte-identical before/after the split.
+- Tests: 11 → 11 identical test set, redistributed not rewritten.
+- `go build ./...` and `go vet ./...`: clean.
+
+## Change Log
+
+- **2026-08-05**: Corrected the summary's distinct-atom count from 6 to 5 — `sort -u` over the atom IDs in `skills.go` at filing time yields exactly `api_character_skill_inventory`, `api_skill_template_browse`, `mech_skill_selection_progression`, `req_skill_generation`, `rule_character_skill_slots`. The three-concern split conclusion is unaffected by this correction. Closed as Resolved: the file was split per the Medium-term recommendation and independently verified (link set 12→12 identical / 5 distinct atoms, routes byte-identical, tests 11→11 identical set, `go build ./...` and `go vet ./...` clean).

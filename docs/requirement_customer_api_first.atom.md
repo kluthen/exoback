@@ -13,6 +13,7 @@ dependents:
   - [[us_api_flow_game_turn]]
   - [[us_api_flow_matchmaking]]
   - [[upsilonapi:api_help_endpoint]]
+  - [[upsilonapi:mechanic_skill_payload_resolution]]
 ---
 
 # API-First Experience & Documentation

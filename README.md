@@ -1,6 +1,6 @@
 # Upsilon: A Multi-Service Game Platform
 
-**Upsilon** is a multi-service game platform, umbrella-repo'd across Git submodules and governed end to end by the Atomic Traceable Documentation (ATD) framework. Today it ships one live game — **UpsilonBattle**, a turn-based Tactical RPG (TRPG) for concurrent multiplayer combat and AI skirmishes — served through a shared platform gateway (`upsilonhub`) alongside extracted substrate services for identity (`upsilonauth`) and economy (`upsiloneconomy`). The v3 trajectory grows this into a four-game platform (battle, tycoon, spy, digital) composed on shared platform substrates and vocabularies, with the standing rule that **games never import games** — see [`architecture/service_map.md`](architecture/service_map.md) and [`architecture/platform_architecture.md`](architecture/platform_architecture.md) for the full service ownership map and platform direction.
+**Upsilon** is a multi-service game platform, umbrella-repo'd across Git submodules and governed end to end by the Atomic Traceable Documentation (ATD) framework. Today it ships one live game — **UpsilonBattle**, a turn-based Tactical RPG (TRPG) for concurrent multiplayer combat and AI skirmishes — served through a shared platform gateway (`upsilonhub`) alongside extracted substrate services for identity (`upsilonauth`) and economy (`upsiloneconomy`). The v3 trajectory grows this into a four-game platform (battle, tycoon, spy, digital) composed on shared platform substrates and vocabularies, with the standing rule that **games never import games**. The full architecture reference set — service ownership map, platform direction, and the [playbook for adding a new service](architecture/how_to_add_a_service.md) — starts at [`architecture/INDEX.md`](architecture/INDEX.md).
 
 ## Battle: The Game At a Glance
 - **Play Modes:** 1v1 (PvE or PvP) and 2v2 (PvE or PvP).
@@ -33,7 +33,7 @@ The Upsilon platform is built as a modular multi-repo system. Each core componen
    - One image serves the API + SPA, runs migrations (`-migrate-mode`) and seeds (`-seed`).
 
 3. **Identity Service (`upsilonauth`)**:
-   - Extracted auth/identity substrate (SSO-bound target). Owns accounts, tokens, admin user registry and enrollment; the hub validates tokens against it over S2S.
+   - Extracted auth/identity substrate (SSO-bound target). Owns accounts, tokens, admin user registry and per-account service registrations; the hub validates tokens against it over S2S. Registering never implies enrollment — an account binds to a game only through that game's own opt-in enroll call, surfaced via the hub's games catalog (`GET /api/v1/games`) and the SPA's game-selection page; enrollment is additive-only, never revoked.
 
 4. **Economy Service (`upsiloneconomy`)**:
    - Extracted economy substrate — wallets, ledger, purchases/awards — consumed by the hub (and, over time, every game) over the internal S2S surface.
@@ -91,6 +91,8 @@ The project provides a pre-configured development environment via **[.devcontain
 - **Port Forwarding:**
   - `8085`: Caddy front door (hub API + SSE + SPA)
   - `8090`: Upsilon Hub (direct)
+  - `8091`: Upsilon Auth (identity/SSO, direct)
+  - `8092`: Upsilon Economy (internal-only, direct)
   - `8081`: Upsilon Engine (Go API)
   - `5173`: Vue Frontend (Vite dev server, HMR)
 
@@ -137,12 +139,12 @@ A single **CI Pipeline** runs three staged jobs on push / PR to `main`:
 - **Integration & E2E**: orchestrates the ephemeral [docker-compose.ci.yaml](docker-compose.ci.yaml) stack and runs the `upsiloncli` customer + edge scenario suites — specialized CLI bots simulating real player journeys through the hub and engine.
 
 ### Code Health Standards (`scripts/code_health_check.py`)
-Upsilon enforces strict maintainability standards across all supported languages (Go, Python, JS, Vue). These are verified locally via the pre-commit hook and in CI.
+Upsilon defines strict maintainability standards across all supported languages (Go, Python, JS, TypeScript, Vue, PHP). The checker is **available but not automated**: it is not wired into the pre-commit hook (currently disabled there) and is not run in CI. It should be run **manually at the end of each development session** — `python3 scripts/code_health_check.py [path]`, where `path` is a single file or a directory (defaults to the current directory) — to keep code quality from degrading over time. A full-repo run completes in well under a second.
 
 - **File Length:** Warning above 400 effective LOC, Error above 600 LOC.
 - **Complexity:** Function nesting depth must not exceed 4 levels.
 - **Documentation:** Every function needs an intent comment; missing docs on exported functions is an Error.
-- **ATD Traceability:** Each file must have 1-10 `@spec-link`/`@test-link` tags (warn above 5). Under 1 or over 10 links results in an Error.
+- **ATD Traceability:** Each file must link 1-10 distinct ATD atoms via `@spec-link`/`@test-link` tags (warn above 5 distinct). Repeating the same atom ID across multiple tags counts once, not per occurrence. Under 1 or over 10 distinct atoms results in an Error.
 - **Validity:** All `@spec-link` IDs must resolve to a valid ATD Atom in the `docs/` directory.
 
 **Exemptions:**
@@ -181,7 +183,9 @@ All fundamental mechanics, structural constraints, entities, and network rules t
 | [upsilonapi default branch carries 15 Dependabot vulnerabilities (7 critical)](issues/Ref_20260722_upsilonapi_dependabot_vulns.md) | 2026-07-22 | Open | High | On pushing to `ecumeurs/upsilonapi` (2026-07-22, go.work-sync dependency comm... |
 | [Five match-resolution E2E scenarios race engine game-start and fail on dev machines](issues/Ref_20260722_match_start_race_local_env.md) | 2026-07-22 | Open | Low | The four scenarios act on a match immediately after the SSE `match.found` eve... |
 | [GDPR export loses per-game data coverage under the game-agnostic account model](issues/Ref_20260722_gdpr_export_per_game_gap.md) | 2026-07-22 | Open | Medium | Under the 2026-07-22 remodel, upsilonauth's `GET /auth/export` returns accoun... |
-| [`gateway/skills.go` breaches the 10-link ATD cap (12) and conflates three concerns](issues/ISS-126_20260804_skills_go_atd_link_cap.md) | 2026-08-04 | Open | Medium | `upsilonhub/internal/gateway/skills.go` carries **12 `@spec-link` tags agains... |
+| [~60 Go files carry `@spec-link`/`@test-link` in the file header, and the two governing rule documents disagree on whether that is allowed](issues/ISS-129_20260806_atd_link_placement_file_headers.md) | 2026-08-06 | Open | Medium | A repo-wide scan finds **~60 Go files with at least one `@spec-link`/`@test-l... |
+| [`code_health_check.py` matches `@lint-ignore-*` tags by naive whole-file substring, silently skipping any file that merely *mentions* them](issues/ISS-128_20260806_lint_ignore_naive_substring_match.md) | 2026-08-06 | Open | Medium | `code_health_check.py` decides whether to suppress a check by testing `if '<t... |
+| [`user_flows.spec.ts` breaches the 10-link ATD cap (13 occurrences / 12 distinct atoms), pre-existing](issues/ISS-127_20260805_user_flows_spec_atd_link_cap.md) | 2026-08-05 | Open | Medium | `upsilonbattleui/tests/playwright/user_flows.spec.ts` carries **13 `@spec-lin... |
 | [Registration requires full address and birth date — neither is needed for gameplay](issues/ISS-125_20260801_registration_requires_address_birthdate.md) | 2026-08-01 | Open | Medium | Registration currently mandates a full residential address (`full_address`) a... |
 | [New account shows 0 characters on the dashboard (SPA never calls battle/enroll)](issues/ISS-124_20260801_new_account_dashboard_empty_roster.md) | 2026-08-01 | Open | High | A freshly registered account shows 0 characters on the dashboard, persisting ... |
 | [host-side CI seed/trigger scripts assume a single hub-owned DB — superseded by the 6-image compose stack](issues/ISS-123_20260724_host_side_ci_seed_scripts_superseded.md) | 2026-07-24 | Open | Medium | `scripts/seed_ci.sh` resets **one** database (`$DATABASE_URL`), runs `upsilon... |
