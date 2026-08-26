@@ -1,6 +1,6 @@
 # TODO — CI-blocking issues ISS-102 / ISS-103 / ISS-130 / ISS-131
 
-**Status:** active — steps 0-8b done, step 9 Half A DONE + lead-verified; Half B (live-stack E2E) running next
+**Status:** active — step 9 essentially DONE (Half A mutation-verified; Half B 36/37 + 52/52, all 6 targets green). Characterizing 1 unrelated pre-existing scenario failure, then steps 10-12.
 **Owner:** coordination-leader
 **Opened:** 2026-08-19
 
@@ -773,6 +773,109 @@ restored the source (verified clean + green afterward):
 Each mutation was caught by exactly the right subtest and nothing else.
 **Conclusion: this suite would have caught ISS-131 at its root.** The ~1-in-8 flaky e2e is no
 longer the only thing standing between a serialization regression and production.
+
+---
+
+### Half B ATTEMPT 1 (2026-08-26) — INVALID RUN, root-caused. Found a NEW bug: ISS-135 candidate.
+
+Ran `run_ci_local.sh --fresh --stages build,unit,integration --skip-playwright` from a fresh
+clone of the just-pushed remote (deliberately NOT `--local`, so the pushed gitlinks were proven
+to resolve — they did).
+
+- **STAGE 1 build + STAGE 2 unit: PASSED.** This is real, load-bearing evidence: it is the first
+  time the ISS-132 fix ran in an actual CI clone rather than the worktree. All 12 go.work modules
+  vetted and tested there. ISS-132 is confirmed fixed end-to-end.
+- **STAGE 3 integration: 2/37 scenarios, 8/51 edge cases passed.** All six of this round's target
+  scenarios among the failures.
+
+**This run is INVALID — do not read anything into those scenario results.** Root cause found and
+proven, and it is NOT a regression from this round's fixes:
+
+`run_ci_local.sh:295` ran `docker compose up -d --wait` **without `--build`**. Compose only builds
+images that do not already exist. Unlike an ephemeral GitHub runner (ci.yml:205 prunes all images
+and starts cold), this mirror keeps images between runs. So:
+- `upsilon-hub-ci-auth`/`-economy` had no cached image → built fresh 2026-08-26 14:39.
+- `upsilon-hub-ci-hub`, `-engine`, `-tester` DID have images → silently reused from **2026-07-20**.
+
+The July-20 hub predates the Phase 4 auth cutover. Proof from `ci_logs/hub.log`: the running hub
+registered `/api/v1/auth/login`, `/api/v1/auth/register` etc. served by an in-hub `gateway.authAPI`
+— routes the current source explicitly no longer mounts (router.go comment: "moved to upsilonauth
+in the Phase 4 cutover ... the hub mounts none of it"). That stale hub also lacks `mountInternal`,
+so all **489** hub errors were the single route `POST /internal/v1/players/<uuid>/account`
+returning 404 to upsilonauth's AccountPush client (`upsilonauth/internal/accountpush/hubclient.go:38`).
+No account push → registration/login broken → the entire suite cascades.
+
+Ruled out along the way (each checked, not assumed): route missing from source (it exists,
+`internal_consumer.go:38`); registrar never called (it is, `router.go:109`); mount condition
+unmet (`S2S_TOKEN=ci-internal-token` IS set in compose, and `PlayerStats` is unconditionally
+non-nil at `main.go:181`); wrong submodule commits in the clone (verified 9801c13 / hub 0aac6f4 /
+api 9e5eb50).
+
+**Severity: this is ISS-132's twin and arguably worse.** ISS-132 was "tests never run"; this is
+"tests run against five-week-old artefacts and return a red/green signal that means nothing".
+Every prior local-mirror E2E result is retrospectively suspect. GitHub CI is NOT affected.
+
+**Fixes applied to `scripts/run_ci_local.sh` (uncommitted, pending user review):**
+1. `up -d --build --wait` + a comment explaining why `--build` is mandatory, not an optimisation.
+2. Log collection loop extended with `auth-migrate auth-seed auth economy-migrate economy-seed
+   economy` — it still listed only the pre-extraction services, so an auth/economy failure left
+   no evidence behind. ci.yml already collects these (lines 258-261); the mirror had drifted.
+
+**Half B ATTEMPT 2 (after the `--build` fix) — THE ROUND IS VALIDATED.**
+
+- **Scenarios: 36 passed / 1 failed** (was 2/37 on the stale images).
+- **Edge cases: 52 passed / 0 failed** (was 8/51).
+- **ALL SIX target scenarios PASSED**, i.e. the entire step-9 evidence gap is now closed with
+  runtime evidence rather than static reasoning:
+  `e2e_match_resolution_forfeit`, `e2e_match_resolution_standard_with_2`,
+  `e2e_progression_constraints_with_2`, `e2e_progression_post_win_with_2`,
+  `e2e_skill_equip_battle` (the ISS-131 scenario), `edge_auth_session_timeout`.
+- Hub logged exactly **1** ERROR across the whole suite, and it is a deliberate edge-case probe
+  (`/api/v1/profile/character/not-a-uuid` -> invalid UUID), i.e. a test passing correctly.
+  Compare: 489 errors, all one route, on the stale-image run.
+- The log-collection fix proved itself immediately: `auth.log` (341K) and `economy.log` were
+  captured this time; on attempt 1 they did not exist.
+
+**Caveat on `e2e_skill_equip_battle`:** it passed, but it remains a ~1-in-8 AoE-dependent flake,
+so this single green is NOT by itself proof that ISS-131 is fixed. The real proof is the Half A
+mutation testing. This is exactly the division of labour the user directed, and it worked.
+
+### The one remaining failure: `e2e_friendly_fire_skill_test` — NOT a regression from this round
+
+Assertion: "Fireball friendly-fire was never rejected within 3 matches" (scenario line 154).
+
+Evidence it is unrelated to this round's changes:
+1. **The scenario file was not touched by this round.** Last modified in `006a27f`; this round's
+   upsiloncli commit is `c5dc3c6`.
+2. **The bot never reached the Pyromancer check at all** — 0 occurrences of "Pyromancer
+   attempting". It never got a turn: 30 of 33 match attempts failed with
+   `Conflict: You are currently participating in an active match`, alongside 32x "not my turn
+   yet" and 32x "Cleaning up session before retry". This is a session-cleanup / turn-starvation
+   loop, not a serialization or masking failure.
+3. **The ISS-103 over-masking hypothesis is DEAD.** It was the one plausible way this round could
+   have caused this symptom (strip `equipped_skills` from self/allies -> bot never identifies as
+   Pyromancer). Measured: `"equipped_skills"` appears 170x in the scenario log and is empty in
+   only 9. Self/ally loadouts are intact; masking is behaving.
+4. No existing issue covers this scenario.
+
+**CHARACTERIZED (3 isolated runs against a freshly built stack): it is an INTERMITTENT FLAKE.**
+
+| Run | Exit | `Conflict: already in an active match` | Cast attempts reached |
+|-----|------|-----|-----|
+| 1 | 0 (PASS) | 0 | 1 |
+| 2 | 1 (FAIL) | 24 | 0 |
+| 3 | 0 (PASS) | 0 | 1 |
+
+The correlation is exact: when the bot leaves its match cleanly it reaches the Fireball cast and
+passes; when it does not, it burns all 3 match attempts on `Conflict` and never reaches the check.
+So the assertion text ("friendly-fire was never rejected") is misleading — friendly-fire rejection
+is not what is broken. The defect is session/match cleanup between attempts, and roughly 1 run in
+3 trips it even in isolation.
+
+**Disposition: pre-existing, unrelated to this round, worth its own issue.** Proposed as ISS-136 at
+step 11 (not filed yet — the user asked only for the CI issue to be filed). Suggested severity
+Medium: it is a test-integrity defect that will keep producing false CI failures, and the
+misleading assertion message will send the next investigator after the wrong subsystem.
 
 ---
 

@@ -291,8 +291,16 @@ stage_integration() {
         warn "Skipping Playwright install (--skip-playwright or node missing)"
     fi
 
-    info "Booting Upsilon CI stack (docker compose --wait)"
-    $COMPOSE up -d --wait --wait-timeout 300
+    # --build is MANDATORY, not an optimisation. `docker compose up` only builds
+    # images that do not already exist locally, and unlike an ephemeral GitHub
+    # runner (which prunes and starts cold) this mirror keeps images between
+    # runs. Without it, compose silently reuses whatever was built last time:
+    # a run on 2026-08-26 booted a hub image built 2026-07-20, from before the
+    # Phase 4 auth cutover, which no longer had the /internal/v1 AccountPush
+    # route — 78 scenarios failed for a reason that existed only in the image.
+    # A CI mirror that tests stale artefacts is worse than no mirror at all.
+    info "Booting Upsilon CI stack (docker compose --build --wait)"
+    $COMPOSE up -d --build --wait --wait-timeout 300
     $COMPOSE ps
 
     if [ "$SKIP_PLAYWRIGHT" -eq 0 ] && command -v node >/dev/null 2>&1 && [ -d upsilonbattleui/node_modules ]; then
@@ -316,7 +324,7 @@ stage_integration() {
     if [ "$rc" -ne 0 ]; then
         warn "Collecting docker logs (failures detected)"
         mkdir -p ci_logs
-        for svc in hub-migrate hub-seed hub proxy engine db tester; do
+        for svc in hub-migrate hub-seed hub proxy engine db tester auth-migrate auth-seed auth economy-migrate economy-seed economy; do
             $COMPOSE logs "$svc" > "ci_logs/$svc.log" 2>&1 || true
         done
         info "Service logs saved under $TARGET_DIR/ci_logs/"
