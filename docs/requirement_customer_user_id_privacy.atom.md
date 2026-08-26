@@ -8,6 +8,7 @@ tags: security,privacy,auth
 version: 1.2
 parents: []
 dependents:
+  - [[requirement_foe_loadout_privacy]]
   - [[upsilonapi:arch_api_id_masking_gateway]]
   - [[upsilonbattle:entity_player]]
 human_name: Internal Identity & Ownership Privacy

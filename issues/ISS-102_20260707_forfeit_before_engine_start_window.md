@@ -114,3 +114,10 @@ so gateway and clients can reason about the window explicitly.
 - `upsiloncli/tests/scenarios/e2e_match_resolution_forfeit.js`
 - `upsiloncli/tests/logs/e2e_match_resolution_forfeit.log` (2026-07-07 run)
 - Related: ISS-101 (fast engine AI auto-pass behavior)
+
+## Change Log
+- **2026-08-19**: Reproduced in CI (umbrella run `32230359259`, commit
+  `5a3e854`), same `game.not.in.progress` 400 on immediate forfeit — the
+  first CI run to reach the E2E suite since the Phase 4/5 auth/economy
+  extraction was pushed. No new information beyond the existing analysis;
+  not re-filed as a separate issue.

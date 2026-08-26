@@ -102,3 +102,10 @@ masking is driven by contract, not accretion.
 - `battleui/app/Http/Resources/BoardStateResource.php`
 - `upsiloncli/tests/scenarios/e2e_battle_starts_privacy_check.js`
 - ISS-077 (skill inspection & privacy rules — the designed contract)
+
+## Change Log
+- **2026-08-19**: Reproduced in CI (umbrella run `32230359259`, commit
+  `5a3e854`), same "PRIVACY VIOLATION: Foe has visible skills" assertion
+  failure — the first CI run to reach the E2E suite since the Phase 4/5
+  auth/economy extraction was pushed. No new information beyond the
+  existing analysis; not re-filed as a separate issue.

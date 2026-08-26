@@ -13,6 +13,7 @@ dependents:
   - [[upsilonbattle:rule_combat_range_validation]]
   - [[upsilonbattle:rule_forfeit_battle]]
   - [[upsilonbattle:rule_team_mechanics]]
+  - [[upsilonbattle:specification_arena_lifecycle]]
 ---
 # Taking a Combat Turn Story
 
