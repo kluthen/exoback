@@ -4,7 +4,7 @@
 **Ref:** `ISS-131`
 **Date:** 2026-08-19
 **Severity:** High
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonhub/internal/gateway` (SSE edge) / `upsilonhub/internal/games/battle`
 **Affects:** `upsiloncli/tests/scenarios/e2e_skill_equip_battle.js`, any client waiting on post-match-found battle events
 
@@ -119,3 +119,50 @@ client instead of a bare timeout.
 - `upsiloncli/internal/script/bridge_battle.go`
 - Related: ISS-102 (forfeit rejected in engine startup window), ISS-119
   (match-resolution scenarios race engine game-start)
+
+---
+
+## Correction (2026-08-26)
+
+**Status changed Open -> Resolved.** The original title/framing blamed SSE event delivery, but SSE
+was never at fault. The record is corrected here to the actual root cause: an engine
+marshal/unmarshal asymmetry compounded by a hub silent-swallow, pre-existing and unrelated to
+Phase 4/5.
+
+**Actual root cause chain:**
+1. `upsilontypes/property/def/skill.go:177-179` — `ZoneProperty.Get()` returns `*ZoneProperty`, not
+   a primitive.
+2. `upsilonapi/handler/skill_generate.go` — `serializeProperty` handled only
+   `IntCounterProperty`/`int`/`bool`/`string`; anything else fell through returning a **zero
+   `api.PropertyDTO`**.
+3. `upsilonapi/api/input.go:36-41` — all `PropertyDTO` fields are `omitempty`, so a zero DTO
+   marshals to `{}`.
+4. `upsilonapi/api/input.go:52-83` — `PropertyDTO.UnmarshalJSON` **rejects `{}`** with
+   `invalid property format: {}`.
+5. `upsilonapi/handler/handler.go:22-27` — the bind failure produces a 400, which the hub silently
+   swallowed, so the symptom surfaced far downstream as "no SSE events" rather than at its true
+   origin.
+
+**Fix as shipped (Options 1+2; Option 3 explicitly rejected):**
+- **Hub** — `CreateMatch` (`upsilonhub/internal/games/battle/matchmaking.go`) now fails on
+  `!result.Success` after the `err` check, restoring parity with its four sibling consumers. The
+  fix belongs in the caller, not the transport, because the transport's non-2xx envelope
+  passthrough is deliberate for the 412 rule-rejection path.
+- **Engine** — `serializeProperty` made **total**: a `*def.ZoneProperty` branch serializing
+  `PatternType`, a `float64` branch feeding the previously-never-written `FValue`, an explicit
+  panic on `*def.EffectProperty` (no honest scalar wire mapping), and a panic on any unrecognized
+  type. The panic is the point: it converts downstream archaeology into a failure at generation
+  time, per CODING_RULE §3.
+- **Option 3 (tolerantly accepting `{}`) was rejected as actively harmful**: it would let an AoE
+  skill enter battle with its Zone pattern silently dropped and no area effect — trading a loud
+  failure for a silent wrong-behavior bug, violating CODING_RULE §3 and §4. It was only ever
+  justified as a compatibility shim for durable poisoned `character_skills.instance_data` rows;
+  with the game not live and the DB flushable, that justification is gone.
+- **Deployment note that must survive on record:** the `character_skills` (or full DB) flush must
+  land on the same deploy as the engine change — pre-fix rows are undecodable by design once
+  Option 3 is off the table.
+
+**Regression coverage:** `upsilonapi/handler/skill_generate_test.go` now round-trips all 6
+non-panicking `property.Property` implementations through marshal->unmarshal and asserts the
+marshaled form is never `"{}"`, plus two panic tests. The implementation set was established closed
+at exactly 7 types, and the tests were mutation-verified.

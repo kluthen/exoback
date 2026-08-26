@@ -1,6 +1,6 @@
 # TODO — CI-blocking issues ISS-102 / ISS-103 / ISS-130 / ISS-131
 
-**Status:** active — step 9 essentially DONE (Half A mutation-verified; Half B 36/37 + 52/52, all 6 targets green). Characterizing 1 unrelated pre-existing scenario failure, then steps 10-12.
+**Status:** steps 0-11 COMPLETE and pushed. Only step 12 (cleanup) remains — user-gated, awaiting explicit validation.
 **Owner:** coordination-leader
 **Opened:** 2026-08-19
 
@@ -93,8 +93,8 @@ apply.
       class (known files, fix on file), but carries one real unknown — 17 never-executed
       test files may go red on first run. See "ISS-132" section below.
 - [~] 9. IN PROGRESS. Half A (serialization unit tests) DONE + mutation-verified. Half B (live-stack E2E) next.
-- [ ] 10. documentalist post-task papertrail sync (Workflow B).
-- [ ] 11. Final report to user; set Status and Handover.
+- [x] 10. documentalist post-task papertrail sync (Workflow B). **DONE 2026-08-26 — see STEP 10 RESULT.**
+- [x] 11. Final report to user; set Status and Handover. **DONE 2026-08-26.**
 - [ ] 12. Cleanup pass — only after the user validates completion.
 
 ---
@@ -500,17 +500,23 @@ None of these were introduced by the planned fixes; all predate this task.
 
 ## Open questions (current)
 
+**ALL CLOSED as of 2026-08-26 — the user answered "yes to all" on the five step-11
+dispositions and authorised commit + push of everything.** Resolutions:
+- (a) ISS-130 severity High → **Low**, Status → Resolved. APPROVED.
+- (b) "logout during the renewal window" revocation hole → **file it** (ISS-137). APPROVED.
+- (c) ~87 scenarios never calling `battle_enroll` — Phase-4 staleness class → **file it**
+  (ISS-138), with ISS-130 cross-referenced as its first instance. APPROVED.
+- (d) friendly-fire flake → **filed as ISS-136** (done, see above). CLOSED.
+- (e) the deferred pre-existing ATD defects → **file a cleanup issue** (ISS-139). APPROVED.
+- (f) documentalist's two recommended ARCHITECTURE DRAFT→REVIEW advances
+  (`upsilonhub:module_foe_loadout_masking`, `upsilonbattle:specification_arena_lifecycle`)
+  → **apply both**. `requirement_foe_loadout_privacy` stays DRAFT (BUSINESS layer). APPROVED.
+- Submodule choreography question CLOSED: the change set spans umbrella + submodules;
+  push order is submodules first, umbrella last, else dangling gitlinks.
 - (ISS-131 option choice CLOSED 2026-08-20 — see User decisions.)
-- Whether the two newly-surfaced findings get filed as their own issues: (a) "logout during
-  the renewal window" revocation hole; (b) the ~87 scenarios never calling `battle_enroll`
-  directly — a systematic Phase-4 staleness class.
-- Whether to correct ISS-130's and ISS-131's issue files (both have materially wrong
-  premises on record) before or alongside the fixes.
-- Whether any fix must land in a submodule (upsilonauth / upsilonapi / upsiloncli)
-  rather than the hub — affects commit/push choreography across submodule pointers.
-- (ATD-defect filing question CLOSED 2026-08-24 — recommendation adopted: the broken
-  `mechanic_mec_skill_payload_resolution` id is fixed inside this task as Workflow E item 0;
-  the other 7 defects are deferred to a dedicated cleanup issue, to be filed at step 11.)
+- (ATD-defect filing question CLOSED 2026-08-24 — the broken
+  `mechanic_mec_skill_payload_resolution` id was fixed inside this task as Workflow E item 0
+  and the `edge_auth_session_timeout.js` test-link as item 8; the remaining defects go to ISS-139.)
 
 ---
 
@@ -879,77 +885,94 @@ misleading assertion message will send the next investigator after the wrong sub
 
 ---
 
-## Handover  (REWRITTEN 2026-08-26, post-ISS-132, pre-compaction — replaces all prior handovers)
+## STEP 10 RESULT — documentalist Workflow B sync (returned 2026-08-26)
 
-**Where things stand:** steps 0-8 and 8b are COMPLETE. Step 9 (verification) is NEXT and is the
-only remaining substantive work; 10-12 follow it. This handover is written to survive a context
-compaction — everything step 9 needs is below, assume nothing is in memory.
+Scope: atoms/code touched by the ISS-102/103/130/131 round (`3db0e9d` umbrella, `4830137` battle, `250de60` api, `0aac6f4` hub, `c5dc3c6` cli) plus the rewritten `skill_generate_test.go`. ISS-132/133/134/135 excluded per the standing ATD-scope ruling (CI/tooling is out of ATD).
 
-### Git state (READ THIS FIRST)
-- Umbrella HEAD = `3db0e9d`, **1 unpushed commit**. Four submodules (`upsilonapi` `250de60`,
-  `upsilonbattle` `4830137`, `upsilonhub` `0aac6f4`, `upsiloncli` `c5dc3c6`) each have 1 unpushed
-  commit. **NOTHING HAS BEEN PUSHED.** Push submodules FIRST, then the umbrella, or the gitlink
-  pointers dangle — `scripts/push_all.sh` does exactly this ordering.
-- The ISS-102/103/130/131 fixes are IN those commits. Do not re-do them.
-- **Uncommitted in the working tree right now** (the ISS-132 change set + bookkeeping):
-  `.github/workflows/ci.yml`, `scripts/run_ci_local.sh`, `scripts/run_all_unit_tests.sh`,
-  new tracked `scripts/list_go_modules.sh`, newly-tracked `scripts/push_all.sh`,
-  `README.md`, `issues/README.md`, `TODO.md`, and untracked `issues/ISS-132`, `ISS-133`, `ISS-134`.
-  All 13 submodules are CLEAN. Nothing from ISS-132 has been committed — user has not asked.
+**Drift found: NONE** across all 7 governing atoms and all 3 required code tags.
 
-### STEP 9 — the plan, and the one real evidence gap
+Tags verified present and correctly placed atop the named function (not a file/package header):
+- `[[mechanic_skill_payload_resolution]]` — `upsilonapi/handler/skill_generate.go:103`, above `serializeProperty`.
+- `[[module_foe_loadout_masking]]` — `upsilonhub/internal/games/battle/masking.go:81`, above `maskEntities`.
+- `[[upsilonapi:api_websocket_arena_updates]]` — `masking.go:18`, atop `MaskBoardState`.
 
-**Gap:** five `upsiloncli` scenario files were modified but **NEVER EXECUTED** (no stack was
-available; the executor said so plainly rather than claiming a pass). Every other piece of the
-committed change set has runtime evidence. Step 9 must run these against a live stack:
-`edge_auth_session_timeout`, `e2e_match_resolution_forfeit`,
-`e2e_match_resolution_standard_with_2`, `e2e_progression_constraints_with_2`,
-`e2e_progression_post_win_with_2`. **Do not accept static reasoning as closure on these.**
+Status changes actually applied (exactly one, IMPLEMENTATION layer only, per Lifecycle Discipline):
+- `upsilonapi:mechanic_skill_payload_resolution` — DRAFT → **REVIEW** (10 impl / 9 test links, OK). Only file touched: `upsilonapi/docs/mechanic_skill_payload_resolution.atom.md`, via `atd update --set status=REVIEW`. **Uncommitted.**
 
-**Also re-run `e2e_skill_equip_battle`** (the scenario that surfaced ISS-131). It is a
-**~1-in-8 data-dependent flake** — it only fails when the skill roll produces an AoE skill
-(~12-13% at Grade I, much higher at Grade II-V). A single green run proves nothing.
+Recommended but NOT self-executed (need confirmation; ARCHITECTURE/BUSINESS layers):
+1. `upsilonhub:module_foe_loadout_masking` — ARCHITECTURE DRAFT → REVIEW; full spec+test link coverage, code/atom agreement confirmed.
+2. `upsilonbattle:specification_arena_lifecycle` — ARCHITECTURE DRAFT → REVIEW; its `NO_IMPL` is by design (enforcement lives in sibling atoms), not a gap.
+3. `requirement_foe_loadout_privacy` — BUSINESS DRAFT, untouched; substantiated by its implemented+tested ARCHITECTURE dependent, but any change needs human sign-off.
 
-**USER'S DIRECTION ON THIS (2026-08-26), adopt it:** don't lean on the flaky e2e for proof.
-Add a round of **unit tests covering ALL serialization cases**, and use the e2e only to validate
-the scope at large. The lead confirmed the gap is real: `upsilonapi/handler/skill_generate_test.go`
-today has exactly 4 tests — `TestSerializeProperty_ZoneRoundTrip`, `_FloatValue`,
-`_PanicsOnUnrecognizedType`, `_PanicsOnEffectProperty`. Nothing enumerates every property type the
-engine can emit and asserts each serializes. That totality claim is what the panic exists to
-enforce and it is currently untested as a set. Unit tests make it deterministic; the e2e then only
-has to prove the wiring. The user will review the e2e scenario themselves.
+Observations (non-blocking, pre-existing):
+- The shared pre-tick `game.not.in.progress` guard (`ruler_actions.go`/`ruler_turn.go`) has no engine-level unit test exercising it directly. Pre-dates this round.
+- `atd lint`: 12 pre-existing structural findings (mostly missing `## EXPECTATION`), identical before and after; none touch this round's atoms.
+- Tooling caveat confirmed concretely: with no `atd index` built, `atd congruence` returned a false negative on `rule_forfeit_battle` (claimed "incomplete"; direct read shows all four sections populated), and `atd crawl --gaps` lists two atoms with real graph links as orphaned. Consistent with the user's standing "that's a me issue" note — not acted on.
 
-**Deployment prerequisite (hard, not a suggestion):** the `character_skills` flush (or full DB
-flush) must happen on the same deploy as the engine change. Pre-fix rows carrying
-`"targeting":{"Zone":{}}` are undecodable BY DESIGN now that the tolerant-decoder option was
-rejected. The user confirmed the game is not live and the DB may be flushed.
+## ISS-136 filed 2026-08-26 (delegated, lead-verified)
 
-**Before running local CI:** ISS-132 is fixed, so `go vet`/`go test` now cover all 12 `go.work`
-modules. Lead-measured green: 654 pass / 0 fail, ~31s, via the split invocation (default `-p`
-for 10 modules, `-p 1` for auth+economy). Do NOT run the full docker-compose E2E casually — it is
-expensive; it is step 9's actual job.
+`issues/ISS-136_20260826_e2e_friendly_fire_skill_test_flaky.md` — Medium / Open / untracked (not committed).
+Covers the `e2e_friendly_fire_skill_test.js` flake: PASS/FAIL/PASS over 3 isolated runs; failing run
+`conflicts=24, cast_attempts=0`, never reached a castable state. Two contributing causes recorded:
+(1) the friendly-fire probe only fires when the acting turn-holder is `charIds[0]`, the sole character
+carrying the item-granted Fireball — every other own-turn silently skips the probe (`me =
+upsilon.currentCharacter()` at :95 vs `character_equip` on `charIds[0]` only); (2) `matchAttempt--`
+at :79 lets match-creation conflict retries burn wall-clock without consuming the `MAX_MATCHES` budget.
+ISS-103 masking hypothesis documented as exonerated by measurement (`equipped_skills` present 170x /
+empty 9x). Open question flagged, not asserted: whether `1v1_PVE` composition can field a roster subset
+excluding `charIds[0]`. This supersedes the earlier open disposition (d) "friendly-fire flake as ISS-136".
 
-### Steps 10-12
-- **10** = documentalist Workflow B post-task papertrail sync. Must also confirm the 3 DRAFT atoms
-  created at step 6 now have real `@spec-link` bindings and can advance toward REVIEW.
-  **Scope note: this applies ONLY to the ISS-102/103/130/131 business-layer work.** ISS-132/133/134
-  are CI/tooling and are OUT of ATD scope entirely per the user's 2026-08-26 ruling.
-- **11** = final report + issue-file updates. Still owed: correct the ISS-130 and ISS-131 issue
-  files (both carry materially WRONG premises on record); update ISS-102's for the
-  compliant-by-contract reframing; mark ISS-132 resolved; file the deferred ATD-cleanup issue for
-  the 7 pre-existing defects listed under "Pre-existing ATD defects found by D2"; decide whether to
-  file the two newly-surfaced findings — (a) the "logout during the renewal window" revocation
-  hole, (b) ~87 scenarios never calling `battle_enroll` directly, a systematic Phase-4 staleness
-  class that ISS-130 is merely the first instance of.
-- **12** = cleanup (delete `TODO.md` + orchestration scratch) — **ONLY after the user explicitly
-  validates completion.** Never on the lead's own say-so.
+**Correction on record:** the user's premise that Fireball was not item-granted is not the defect —
+`admin_skill_template_create` → `admin_shop_item_create(skill_template_id)` → `shop_purchase` →
+`character_equip` is already in place (:17-58). The real gap is that it is granted to ONE character,
+not the roster ("character(s)", plural).
 
-### Live risks / assumptions
-- The five scenarios are unrun. That is the single largest unknown in the whole round.
+## Handover  (REWRITTEN 2026-08-26 — step 11 complete; replaces all prior handovers)
+
+**Where things stand:** steps 0-11 are COMPLETE. The round is finished and fully pushed.
+Only step 12 (cleanup) remains, and it is user-gated: delete this `TODO.md` and any
+orchestration scratch ONLY after the user explicitly validates completion. Do not run it
+on the lead's own say-so.
+
+**What step 11 produced.** User answered "yes to all" on the five dispositions and authorised
+commit + push. Executed and lead-verified first-hand (headers, statuses, diffs, git state —
+not taken on the executor's word):
+
+*New issues filed (all Open):* ISS-136 friendly-fire scenario flake (Medium); ISS-137
+logout-during-renewal-window revocation hole (Medium); ISS-138 the ~87-scenario
+`battle_enroll` staleness CLASS (Medium, ISS-130 cross-referenced as its first instance);
+ISS-139 deferred pre-existing ATD defects, 7 items (Low).
+
+*Existing issues corrected — all now Resolved,* each carrying a visible dated
+`## Correction (2026-08-26)` section that states the prior wrong premise rather than silently
+overwriting it: ISS-102 (reframed compliant-by-contract; engine was never wrong, the contract
+was merely unwritten); ISS-130 (severity High -> Low; NOT a security bypass — all three filed
+hypotheses false, the "5s introspection cache" was never built at all); ISS-131 (SSE was never
+at fault; real cause was the engine marshal/unmarshal asymmetry plus a hub silent-swallow);
+ISS-132 (auth/economy unit tests now run).
+
+*ATD advances applied* (ARCHITECTURE layer, user-approved): `upsilonhub:module_foe_loadout_masking`
+and `upsilonbattle:specification_arena_lifecycle` DRAFT -> REVIEW. `upsilonapi:mechanic_skill_payload_resolution`
+DRAFT -> REVIEW came from step 10. `requirement_foe_loadout_privacy` deliberately left DRAFT
+(BUSINESS layer, needs human sign-off).
+
+**Push choreography completed** in the correct order — submodules first, umbrella last:
+`upsilonapi` 9e5eb50..9b973cc, `upsilonbattle` 4830137..7255589, `upsilonhub` 0aac6f4..f1ab27c,
+then the umbrella (carrying the previously-unpushed `7f0bcb9` ISS-135 CI fix, the four corrected
++ four new issue files, this file, and the three submodule pointers).
+
+**Live risks / carried-forward items:**
 - ISS-133 (`upsilonserializer` in-tree, single consumer) — user said KEEP, solve later.
-- ISS-134 (`go work sync` rewrites 3 submodules' `go.mod`/`go.sum`) — filed, Medium, NOT fixed.
-  Note it interacts with step 9: running local CI executes `go work sync` and WILL dirty
-  `upsilonauth`/`upsiloneconomy`/`upsilonhub`, which then makes `push_all.sh` refuse to push them.
-  Revert with `git -C <mod> checkout -- go.mod go.sum` after a CI run.
-- ATD tooling runs degraded (`atd index` never built for root or any submodule). User: "a me
-  issue", do not work it.
+- ISS-134 (`go work sync` rewrites 3 submodules' go.mod/go.sum) — filed, Medium, NOT fixed.
+  Running local CI re-triggers it and will dirty `upsilonauth`/`upsiloneconomy`/`upsilonhub`,
+  which then makes `push_all.sh` refuse them. Revert with
+  `git -C <mod> checkout -- go.mod go.sum` after a CI run.
+- ISS-136/137/138/139 are all Open by design — filed, not fixed, this round.
+- ISS-131's deployment note MUST survive: the `character_skills` (or full DB) flush has to land
+  on the same deploy as the engine change. Pre-fix rows are undecodable by design now that the
+  tolerant `{}` decoder was rejected. This is the single highest-consequence carried item.
+- ATD tooling runs degraded (`atd index` never built). Documentalist independently reproduced
+  the symptom (false negative on `rule_forfeit_battle`, phantom orphans in `crawl --gaps`).
+  User: "a me issue" — do not work it. Recorded as context in ISS-139, not as an action item.
+- Known non-blocking gap: no engine-level unit test exercises the shared pre-tick
+  `game.not.in.progress` guard directly for any action. Pre-existing, noted in ISS-102.

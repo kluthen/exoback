@@ -4,7 +4,7 @@
 **Ref:** `ISS-132`
 **Date:** 2026-08-26
 **Severity:** High
-**Status:** Open
+**Status:** Resolved
 **Component:** `.github/workflows/ci.yml`
 **Affects:** `scripts/run_ci_local.sh`, `scripts/run_all_unit_tests.sh`, `upsilonauth/*`, `upsiloneconomy/*`
 
@@ -102,4 +102,16 @@ Verified via direct inspection: `go.work` includes `./upsilonauth` and `./upsilo
 - `scripts/run_ci_local.sh:206-260`
 - `scripts/run_all_unit_tests.sh`
 - `go.work`
-- Related: [ISS-123](ISS-123_20260724_host_side_ci_seed_scripts_superseded.md) (host-side CI scripts drifted after the same 6-image extraction), [ISS-130](ISS-130_20260819_revoked_token_not_rejected.md) (live auth-layer defect of the kind unit tests in this area would be expected to catch)
+- Related: [ISS-123](ISS-123_20260724_host_side_ci_seed_scripts_superseded.md) (host-side CI scripts drifted after the same 6-image extraction), [ISS-130](ISS-130_20260819_revoked_token_not_rejected.md) (live auth-layer defect of the kind unit tests in this area would be expected to catch; note ISS-130 has since been corrected on record — see its own file — but the general point that this area lacked unit coverage stands)
+
+---
+
+## Resolution (2026-08-26)
+
+**Status changed Open -> Resolved.** This file asserted that `upsilonauth` and `upsiloneconomy`
+unit tests were absent from every executed test set (CI, local CI mirror, and the dev convenience
+runner). That gap has been closed: `./upsilonauth/...` and `./upsiloneconomy/...` are now included
+in the `go vet` / `go test` invocations this file identified as missing them, and the 17
+previously-orphaned `_test.go` files listed above now execute as part of the run. No premise in
+this file was wrong — it is closed out as fixed per the short-term recommendation above, not
+corrected.

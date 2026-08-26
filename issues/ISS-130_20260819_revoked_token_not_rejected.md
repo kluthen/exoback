@@ -3,8 +3,8 @@
 **ID:** `20260819_revoked_token_not_rejected`
 **Ref:** `ISS-130`
 **Date:** 2026-08-19
-**Severity:** High
-**Status:** Open
+**Severity:** Low
+**Status:** Resolved
 **Component:** `upsilonhub/internal/platform/identity` (auth client seam) / gateway middleware ordering
 **Affects:** `upsiloncli/tests/scenarios/edge_auth_session_timeout.js`, any endpoint reachable after a revoked token, `[[req_security_token_ttl]]`
 
@@ -115,3 +115,53 @@ solely on the CLI E2E scenario.
 - `upsilonhub/internal/gateway/token_renewal_test.go`
 - Related: ISS-105 (mid-fight 401 on stale-but-not-yet-expired token — the
   opposite direction of this bug)
+
+---
+
+## Correction (2026-08-26)
+
+**This issue's entire original premise was wrong and is corrected on record here rather than
+silently rewritten.** Severity changed **High -> Low**, Status changed **Open -> Resolved**.
+
+**What this file originally asserted:** that a revoked/logged-out bearer token was accepted by the
+auth layer — a security boundary bypass — evidenced by `edge_auth_session_timeout.js` receiving a
+404 instead of a 401 after `auth_logout`. The file filed three hypotheses for the cause: a stale
+5s introspection cache, incorrect gateway middleware ordering, or an unsound logout/revocation
+path.
+
+**Why that was wrong:** No revoked token was ever accepted. The scenario never reaches logout at
+all — `edge_auth_session_timeout.js:22` dies on its *first* `profile_get` call, made with a fresh,
+genuinely valid token immediately after `auth_register`, for the missing-enrollment reason detailed
+in [ISS-138](ISS-138_20260826_e2e_scenarios_skip_battle_enroll_class.md). The try/catch guarding
+the logout-then-reuse assertion (lines 46-51) is never entered.
+
+All three originally filed hypotheses are false:
+- **The 5s introspection cache does not exist.** It was never implemented;
+  `authclient.AuthenticateToken` (`upsilonhub/internal/transport/authclient/client.go:56-65`)
+  introspects live on every request. There is nothing to evict or go stale.
+- **Middleware ordering is correct.** `mountProfile` wraps every profile route in `RequireAuth`
+  (`profile.go:361-369`); `RequireAuth` aborts with 401 before `c.Next()` runs
+  (`middleware/auth.go:42-48, 98-101`). The handler executed because the token presented was
+  genuinely, currently valid — not because auth was skipped or ordered wrong.
+- **The logout path is sound**, and was in fact never exercised by this run at all. The normal
+  revocation chain (`logout` -> `RevokeToken` -> `DeleteToken` -> `FindTokenByID` ->
+  `pgx.ErrNoRows` -> `ErrUnauthenticated` -> `{active:false}` -> 401) is verified correct end to
+  end and pinned by a passing `TestIntrospectRevokedToken`
+  (`upsilonauth/internal/gateway/introspect_test.go:83-99`). See
+  [ISS-137](ISS-137_20260826_auth_renewal_logout_revocation_hole.md) for a genuine, separate, and
+  much narrower revocation hole found while investigating this report — it is not what this
+  scenario hit.
+
+**Also corrected: a dead reference.** This file originally cited
+`upsilonhub/internal/gateway/token_renewal_test.go` as existing coverage. That file no longer
+exists — the middleware it tested was retired in the Phase-4 cutover; renewal now lives in
+`upsilonauth/internal/gateway/middleware/auth.go:68-97`. The `## References` section above is left
+unedited to preserve the historical record of what was originally cited; treat it as stale.
+
+**Resolution:** The stale scenario was repaired in `upsiloncli` commit `c5dc3c6`.
+
+**Cross-references:**
+- [ISS-138](ISS-138_20260826_e2e_scenarios_skip_battle_enroll_class.md) — the systematic class this
+  was the first instance of.
+- [ISS-137](ISS-137_20260826_auth_renewal_logout_revocation_hole.md) — the genuine, separate
+  revocation hole found while investigating this report.

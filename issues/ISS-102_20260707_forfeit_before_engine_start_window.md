@@ -4,7 +4,7 @@
 **Ref:** `ISS-102`
 **Date:** 2026-07-07
 **Severity:** Medium
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonapi` (arena lifecycle) / `upsilonhub/internal/games/battle/matchmaking.go`
 **Affects:** `upsiloncli` battle scenarios (`e2e_match_resolution_forfeit`, `e2e_match_resolution_standard_with_2`, `e2e_progression_constraints_with_2`, `e2e_progression_post_win_with_2`), any SPA client forfeiting immediately after `match.found`
 
@@ -121,3 +121,22 @@ so gateway and clients can reason about the window explicitly.
   first CI run to reach the E2E suite since the Phase 4/5 auth/economy
   extraction was pushed. No new information beyond the existing analysis;
   not re-filed as a separate issue.
+- **2026-08-26 (Correction / Resolution)**: Status changed Open -> Resolved,
+  reframed as **compliant-by-contract**. The engine was never wrong:
+  `controllerForfeit` (`upsilonbattle/battlearena/ruler/ruler_actions.go:188-198`)
+  rejects with `game.not.in.progress` when `r.CurrentState != InProgress` — the
+  same shared guard every move/attack/skill action uses. That is correct,
+  intentional crash-early behavior, not a bug. What was missing was a written
+  contract, so the rejection looked like a defect. Resolution: the arena
+  lifecycle contract was defined as a new ARCHITECTURE atom
+  (`upsilonbattle:specification_arena_lifecycle`) covering
+  `WaitingForControllers=1` / `InProgress=2` / `Finished=3` with an
+  allowed-action set per state, and the STABLE `rule_forfeit_battle` wording
+  ("at any time during the match") was clarified accordingly with user
+  signoff. The test-side timing race was fixed in `upsiloncli` `c5dc3c6`
+  (scenarios now wait for `game.started` before forfeiting). No engine
+  behavior changed.
+  Known gap recorded, not blocking: there is still no engine-level unit test
+  exercising the shared pre-tick `game.not.in.progress` guard directly for
+  any action — only E2E coverage that now avoids the race. Pre-existing,
+  non-blocking, worth noting.
