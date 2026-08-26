@@ -1,3 +1,4 @@
+# @lint-ignore-atd tooling workflow with no business-layer rationale (CODING_RULE.md §6).
 name: CI Pipeline
 
 on:
@@ -34,8 +35,11 @@ jobs:
       - name: Sync Workspace
         run: go work sync
 
-      - name: Go Vet (Explicit Modules)
-        run: go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... ./upsilontypes/... ./upsilonplatform/...
+      - name: Go Vet (Modules Derived From go.work)
+        # Module list is derived from go.work (see scripts/list_go_modules.sh)
+        # instead of hand-maintained here — this list drifted twice when
+        # services were extracted from the hub (ISS-123, ISS-132).
+        run: go vet $(scripts/list_go_modules.sh)
 
       - name: Build Upsilon API
         run: go build -o /dev/null ./upsilonapi
@@ -104,10 +108,29 @@ jobs:
       - name: Sync Workspace
         run: go work sync
 
-      - name: Run Go Tests (Explicit Modules)
-        # 600s: the hub feature tests boot throwaway Postgres containers
+      - name: Run Go Tests (Modules Derived From go.work)
+        # Module list is derived from go.work (see scripts/list_go_modules.sh)
+        # instead of hand-maintained here — this list drifted twice when
+        # services were extracted from the hub (ISS-123, ISS-132), leaving 17
+        # upsilonauth/upsiloneconomy test files never executed by any `go
+        # test` invocation in the pipeline.
+        #
+        # Run in two invocations, not one: upsilonauth and upsiloneconomy
+        # each start several testcontainers Postgres instances
+        # (accountpush/gateway/identity/seed and api/economy respectively),
+        # joining upsilonhub's own two (gateway, seed) for 8 container-backed
+        # packages total — a 4x jump from the 2 CI already tolerates today.
+        # At default parallelism this measured as 6 flaky `unexpected EOF` /
+        # `failed to receive message` container-contention failures with no
+        # underlying logic regression; forcing just these two modules to
+        # `-p 1` serializes their container starts and measured green on 3
+        # consecutive runs (~30s total vs ~13s unconstrained) — far cheaper
+        # than forcing all 12 modules to `-p 1` (measured ~52-56s). 600s
+        # timeout: the hub feature tests boot throwaway Postgres containers
         # (testcontainers) — the first image pull eats into the timeout.
-        run: go test -count=1 -timeout 600s -json ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... ./upsilontypes/... ./upsilonplatform/... > go-test-results.json 2>&1 || true
+        run: |
+          go test -count=1 -timeout 600s -json $(scripts/list_go_modules.sh --exclude upsilonauth,upsiloneconomy) > go-test-results.json 2>&1 || true
+          go test -count=1 -timeout 600s -json -p 1 $(scripts/list_go_modules.sh --only upsilonauth,upsiloneconomy) >> go-test-results.json 2>&1 || true
 
       - name: Check for Failures
         run: |

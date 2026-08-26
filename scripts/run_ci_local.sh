@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @lint-ignore-atd tooling script with no business-layer rationale (CODING_RULE.md §6).
 # run_ci_local.sh — Reproduce the full GitHub Actions "CI Pipeline" locally.
 #
 # Clones upsilon-hub (with submodules) into a clean sibling directory
@@ -210,9 +211,8 @@ stage_build() {
     info "go work sync"
     go work sync
 
-    info "go vet (explicit modules)"
-    go vet ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... \
-           ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/...
+    info "go vet (modules derived from go.work)"
+    go vet $(scripts/list_go_modules.sh)
 
     info "go build upsilonapi"
     go build -o /dev/null ./upsilonapi
@@ -220,6 +220,10 @@ stage_build() {
     go build -o /dev/null ./upsiloncli/cmd/upsiloncli
     info "go build upsilonhub"
     go build -o /dev/null ./upsilonhub/cmd/upsilonhub
+    info "go build upsilonauth"
+    go build -o /dev/null ./upsilonauth/cmd/upsilonauth
+    info "go build upsiloneconomy"
+    go build -o /dev/null ./upsiloneconomy/cmd/upsiloneconomy
 
     info "Dockerfile syntax checks"
     docker build --check -f upsilonhub/Dockerfile . 2>/dev/null || warn "upsilonhub Dockerfile --check skipped"
@@ -240,13 +244,21 @@ stage_unit() {
     log "STAGE 2: Unit Tests"
     cd "$TARGET_DIR"
 
-    info "Go unit tests"
+    info "Go unit tests (modules derived from go.work)"
     go work sync
+    # Split into two invocations: upsilonauth/upsiloneconomy each start
+    # several testcontainers Postgres instances, joining upsilonhub's own
+    # two for 8 container-backed packages total. At default parallelism
+    # that measured as flaky container-contention failures (no real
+    # regression); forcing just those two modules to `-p 1` serializes
+    # their container starts and measured green across repeated runs.
     # 600s: the hub feature tests boot throwaway Postgres containers.
     go test -count=1 -timeout 600s -json \
-        ./upsilonapi/... ./upsiloncli/... ./upsilonbattle/... ./upsilonhub/... \
-        ./upsilonmapdata/... ./upsilonmapmaker/... ./upsilontools/... \
+        $(scripts/list_go_modules.sh --exclude upsilonauth,upsiloneconomy) \
         > go-test-results.json 2>&1 || true
+    go test -count=1 -timeout 600s -json -p 1 \
+        $(scripts/list_go_modules.sh --only upsilonauth,upsiloneconomy) \
+        >> go-test-results.json 2>&1 || true
     if grep -q '"Action":"fail"' go-test-results.json; then
         err "Go tests FAILED"
         grep '"Action":"fail"' go-test-results.json | head -20
