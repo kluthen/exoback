@@ -14,7 +14,7 @@
 
 `go work sync` — an existing step in both `.github/workflows/ci.yml` (`:35`, `:105`) and `scripts/run_ci_local.sh` — pushes the workspace's resolved dependency versions back down into each member module's own `go.mod`/`go.sum`. Running it today **modifies tracked files inside three submodules**: `upsilonauth`, `upsiloneconomy`, and `upsilonhub`. That it changes anything at all is the finding: the committed manifests in those three submodules no longer describe what the umbrella workspace actually builds against.
 
-This was discovered incidentally while fixing [ISS-132](ISS-132_20260826_auth_economy_unit_tests_not_run.md); it is unrelated to that change and pre-dates it.
+This was discovered incidentally while fixing ISS-132 (resolved; file removed 2026-08-27); it is unrelated to that change and pre-dates it.
 
 ---
 
@@ -95,5 +95,5 @@ Honest scope limit — this issue reports an observed condition, not a proven fa
 - `scripts/run_ci_local.sh` (`stage_build`, `stage_unit`)
 - `upsilonauth/Dockerfile:18-26`, `upsiloneconomy/Dockerfile:19-27`, `upsilonhub/Dockerfile:25-44`
 - `upsilonhub/internal/awards/` (River consumer), `upsilonplatform/jobs`
-- Discovered during: [ISS-132](ISS-132_20260826_auth_economy_unit_tests_not_run.md)
+- Discovered during: ISS-132 (resolved; file removed 2026-08-27)
 - Related: [ISS-123](ISS-123_20260724_host_side_ci_seed_scripts_superseded.md) — the same extraction produced host-script drift

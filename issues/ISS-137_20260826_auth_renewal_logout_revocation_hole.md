@@ -116,5 +116,5 @@ this issue does not evaluate.
 - `upsilonauth/internal/gateway/introspect_test.go:83-99` — `TestIntrospectRevokedToken`, pins the
   sound baseline chain this issue does not dispute.
 - `upsiloncli/internal/script/bridge.go:168` — `jsCall` session token sync.
-- Related: [ISS-130](ISS-130_20260819_revoked_token_not_rejected.md) — found while investigating
+- Related: ISS-130 (resolved; file removed 2026-08-27) — found while investigating
   that report; unrelated cause, this hole was never triggered by it.

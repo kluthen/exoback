@@ -105,5 +105,5 @@ protects against every other defect class recurring undetected.
 - `upsilonhub/internal/gateway/enroll.go:45`, `authenticator.go:66` — item 1.
 - `upsilonhub/internal/transport/authclient/client.go:56-65` — item 5.
 - `upsilonapi/docs/` — item 6.
-- Related: [ISS-130](ISS-130_20260819_revoked_token_not_rejected.md) — corrected-on-record source of
+- Related: ISS-130 (resolved; file removed 2026-08-27) — corrected-on-record source of
   the "no introspection cache exists" finding corroborated by item 5.

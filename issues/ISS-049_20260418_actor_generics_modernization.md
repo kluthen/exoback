@@ -3,7 +3,7 @@
 **ID:** `20260418_actor_generics_modernization`
 **Ref:** `ISS-049`
 **Date:** 2026-04-18
-**Severity:** Low (Architectural Improvement)
+**Severity:** Low
 **Status:** Open
 **Component:** `upsilontools/tools/actor`
 **Affects:** Entire `upsilonbattle` and `upsilonapi` service communications

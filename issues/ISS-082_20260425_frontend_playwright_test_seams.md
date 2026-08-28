@@ -4,7 +4,7 @@
 **Ref:** `ISS-082`
 **Date:** 2026-04-25
 **Severity:** Medium
-**Status:** Open (reopened 2026-06-16 — report capture fixed; specs red, see Update)
+**Status:** Open
 **Component:** `battleui/`, `docker-compose.yaml`, `CI.md`
 **Affects:** Anyone wanting to verify a `BattleArena.vue` / `Components/Arena/Three*.vue` change without manual click-through.
 

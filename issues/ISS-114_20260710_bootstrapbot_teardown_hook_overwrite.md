@@ -4,6 +4,7 @@
 **Ref:** `ISS-114`
 **Date:** 2026-07-10
 **Severity:** Low
+**Status:** Open
 **Component:** `upsiloncli/internal/script/bridge_battle.go` (`jsBootstrapBot`, `Agent.GoTeardownHook`)
 **Affects:** Any CLI scenario that calls `upsilon.bootstrapBot(...)` more than once in the same agent — confirmed in `upsiloncli/tests/scenarios/edge_equip_unowned_character.js`, `edge_skill_unowned_character_equip.js`, `edge_skill_unowned_character_roll.js` (all "victim/owner + attacker" two-account patterns)
 

@@ -3,7 +3,7 @@
 **ID:** `20260709_php_empty_array_skill_payload_start_failure`
 **Ref:** `ISS-106`
 **Date:** 2026-07-09
-**Severity:** Low (downgraded 2026-07-09 — see "Post-wipe update")
+**Severity:** Low
 **Status:** Open
 **Component:** `upsilonapi/api/input.go` (`PropertyDTO.UnmarshalJSON`) / `upsilonhub/internal/games/battle` (`Join`/`CreateMatch` error path)
 **Affects:** any account whose equipped rolled skill contains an empty property map
