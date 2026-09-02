@@ -16,14 +16,8 @@
 | ISS-150 | [ISS-150_20260901_ruler_leak_test_bypasses_actor_ownership.md](ISS-150_20260901_ruler_leak_test_bypasses_actor_ownership.md) | Medium | Open | `TestRulerEntityLeak` writes `GameState.Entities` directly from the test goroutine after `Start()` has handed ownership to the actor loop, racing production's `getEntitiesState`; the resulting Go `fatal error` kills the whole `ruler` test binary and **silently truncates the package's test count** (189->175 observed). Pre-existing; 1 occurrence in 56 runs; a race-free helper already exists and is unused |
 | ISS-149 | [ISS-149_20260830_combat_outcome_trigger_family.md](ISS-149_20260830_combat_outcome_trigger_family.md) | Medium | Open | No entity-attached combat-outcome triggers (on-hit/dodge/parry/miss); existing family is positional-only, the sole hit test conflates miss with dodge, and melee has no hit test at all. Blocks ISS-148 |
 | ISS-148 | [ISS-148_20260830_parry_declared_but_unimplemented.md](ISS-148_20260830_parry_declared_but_unimplemented.md) | Medium | Open | Parry is declared, constructible and in `SkillTargetingProperties` but has zero combat read sites; its intended semantics (hit lands, damage forced to the floor of 1, on-hit effects still fire) need an on-hit trigger family that does not exist — all 5 trigger types are positional |
-| ISS-147 | [ISS-147_20260828_poison_stun_writes_violate_write_isolation.md](ISS-147_20260828_poison_stun_writes_violate_write_isolation.md) | Medium | Open | Poison/Stun writes use the composed-read/absolute-write pattern `rule_entity_property_write_isolation` prohibits; an item CAN buff them, so the "non-buffable" ruling is unenforced |
 | ISS-146 | [ISS-146_20260827_shield_specific_buff_semantics_deferred.md](ISS-146_20260827_shield_specific_buff_semantics_deferred.md) | Medium | Open | Shield-specific buff semantics (cap, overshield, regen) deferred by decision; Shield treated as a plain resource for now |
-| ISS-145 | [ISS-145_20260827_combat_modifiers_not_entity_reachable.md](ISS-145_20260827_combat_modifiers_not_entity_reachable.md) | High | Open | Crit/Accuracy/Dodge exist only as SkillProperties so item & buff payloads drop them silently. **Dodge-read-from-attacker defect FIXED 2026-08-28**; entity-reachability remains open. **Blocks ISS-142** |
-| ISS-144 | [ISS-144_20260827_buff_writeback_folds_into_base_state.md](ISS-144_20260827_buff_writeback_folds_into_base_state.md) | High | Resolved | Property writes fold buffed (composed) values into base state — item `Movement` buffs escalate without bound every turn. **Fixed 2026-08-28** via base-delta writes; reviewer OKAY |
-| ISS-143 | [ISS-143_20260827_bridge_property_alias_map_should_be_removed.md](ISS-143_20260827_bridge_property_alias_map_should_be_removed.md) | Medium | Open | Bridge property alias map papers over a live engine/hub/frontend vocabulary mismatch — remove by coordinated rename |
 | ISS-142 | [ISS-142_20260827_skill_originated_attribute_buffs_unsupported.md](ISS-142_20260827_skill_originated_attribute_buffs_unsupported.md) | High | Open | Skills cannot apply attribute buffs (engine path unwired); seeded buff skills silently run as defaults. **Blocks ISS-140** |
-| ISS-141 | [ISS-141_20260827_no_positive_melee_attack_damage_coverage.md](ISS-141_20260827_no_positive_melee_attack_damage_coverage.md) | Medium | Resolved | No scenario positively asserts that a melee attack lands and deals damage |
-| ISS-140 | [ISS-140_20260827_bridge_skill_payload_silent_property_drop.md](ISS-140_20260827_bridge_skill_payload_silent_property_drop.md) | High | Open | The engine bridge silently drops unrecognized/unusable skill properties instead of erroring. **Blocked by ISS-142** |
 | ISS-139 | [ISS-139_20260826_atd_defects_deferred_from_102_103_130_131_round.md](ISS-139_20260826_atd_defects_deferred_from_102_103_130_131_round.md) | Low | Open | ATD papertrail cleanup — pre-existing defects deferred from the ISS-102/103/130/131 round |
 | ISS-137 | [ISS-137_20260826_auth_renewal_logout_revocation_hole.md](ISS-137_20260826_auth_renewal_logout_revocation_hole.md) | Medium | Open | Logout during the sliding-renewal window leaves the freshly-minted replacement token live |
 | ISS-136 | [ISS-136_20260826_e2e_friendly_fire_skill_test_flaky.md](ISS-136_20260826_e2e_friendly_fire_skill_test_flaky.md) | Medium | Open | `e2e_friendly_fire_skill_test.js` fails non-deterministically — narrow single-character probe window, not a masking regression |
@@ -68,6 +62,22 @@
 | ISS-049 | [ISS-049_20260418_actor_generics_modernization.md](ISS-049_20260418_actor_generics_modernization.md) | Low | Open | Modernize actor library with Go generics |
 
 ---
+
+### Index integrity notes (2026-09-02 cleanup)
+- The 6 issues whose `Status` field read `Resolved` were deleted from this
+  directory, per the standing convention that it tracks **open issues only**:
+  **ISS-140, 141, 143, 144, 145, 147**. Their content is preserved in git history
+  under each Ref (`git log --diff-filter=D -- issues/ISS-NNN*`).
+  - ISS-141 and ISS-144 were resolved in the write-isolation round (`8363c0a`).
+  - ISS-140, 143, 145 and 147 were resolved by the Property Key Space Unification
+    round (`b86599f`..`c69a25a`) and closed in `a4ebc33`.
+- **Zero dangling markdown links resulted**: a repo-wide scan for `](...ISS-NNN...)`
+  found the 6 links only in this index's own table, which was edited in the same
+  pass. The many bare `ISS-NNN` mentions left in code comments, atoms and other
+  issue files are narrative references, not links, and were deliberately left
+  as-is — same treatment as the 2026-08-27 cleanup.
+- Directory and index still match 1:1 (57 files / 57 rows); the auto-generated
+  root `README.md` table was already at 57 active and is unchanged by the deletion.
 
 ### Index integrity notes (2026-08-27 cleanup)
 - All 9 issues whose `Status` field read as closed were deleted: **ISS-101, 102,
