@@ -11,6 +11,7 @@ tags: [stats, progression, items, iss-074]
 dependents:
   - [[upsilonbattle:rule_entity_property_write_isolation]]
   - [[upsilonbattleui:ui_character_full_stat_panel]]
+  - [[upsilontypes:module_property_key_registry]]
 layer: BUSINESS
 ---
 

@@ -1106,7 +1106,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"name\": \"Fireball\",\n    \"behavior\": \"Direct\",\n    \"grade\": \"I\",\n    \"weight_positive\": 5,\n    \"weight_negative\": 0,\n    \"targeting\": {\n        \"Type\": \"Single\",\n        \"Range\": 3\n    },\n    \"costs\": {\n        \"MP\": 3\n    },\n    \"effect\": {\n        \"Type\": \"Damage\",\n        \"Value\": 10\n    }\n}",
+									"raw": "{\n    \"name\": \"Fireball\",\n    \"behavior\": \"Direct\",\n    \"grade\": \"I\",\n    \"weight_positive\": 5,\n    \"weight_negative\": 0,\n    \"targeting\": {\n        \"Zone\": \"Single\",\n        \"Range\": 3\n    },\n    \"costs\": {\n        \"MPLeech\": 3\n    },\n    \"effect\": {\n        \"DamageScale\": 150\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"

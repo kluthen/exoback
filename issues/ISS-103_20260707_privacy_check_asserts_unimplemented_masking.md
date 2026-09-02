@@ -1,5 +1,13 @@
 # Issue: e2e_battle_starts_privacy_check asserts foe-loadout masking that no stack ever implemented
 
+> **Superseded 2026-09-01**: the core premise below ("no stack ever implemented" foe-loadout
+> masking) is now **false**. `upsilonhub/internal/games/battle/masking.go:99-101` strips
+> `equipped_skills`, `equipped_items`, `buffs` for non-self entities, landed in commit `0aac6f4`
+> ("fix(iss-131,iss-103): honour the engine envelope in CreateMatch; mask foe loadouts"). See the
+> Change Log entry below. Status is left `Open` pending a re-run of
+> `e2e_battle_starts_privacy_check` to confirm the scenario now passes — do not treat this file's
+> body above this note as current.
+
 **ID:** `20260707_privacy_check_asserts_unimplemented_masking`
 **Ref:** `ISS-103`
 **Date:** 2026-07-07
@@ -109,3 +117,14 @@ masking is driven by contract, not accretion.
   failure — the first CI run to reach the E2E suite since the Phase 4/5
   auth/economy extraction was pushed. No new information beyond the
   existing analysis; not re-filed as a separate issue.
+- **2026-09-01**: The masking has since been implemented. Verified against
+  source: `upsilonhub/internal/games/battle/masking.go:99-101` now does
+  `delete(masked, "equipped_skills")`, `delete(masked, "equipped_items")`,
+  `delete(masked, "buffs")`, guarded by `if !isSelf`. It landed in upsilonhub
+  commit `0aac6f4` ("fix(iss-131,iss-103): honour the engine envelope in
+  CreateMatch; mask foe loadouts"). This issue's core premise — that no stack
+  ever implemented foe-loadout masking — is therefore **superseded**. This is
+  a **candidate for closure pending a re-run of `e2e_battle_starts_privacy_check`**
+  to confirm the scenario now passes against the hub. Status left `Open`
+  (not flipped to Resolved) until that confirmation lands; see the superseded
+  note at the top of this file.

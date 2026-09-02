@@ -10,6 +10,10 @@
 #   2. Unit Tests          — Go tests (hub feature tests use testcontainers)
 #   3. Integration & E2E   — docker-compose.ci stack + Playwright + scenarios + edge cases
 #
+# Deliberate divergence from ci.yml: GitHub does NOT run Playwright (it is
+# excluded there pending ISS-100/ISS-104), so stage 3 here is a superset. Use
+# --skip-playwright for a strict GitHub-parity run.
+#
 # Usage:
 #   ./scripts/run_ci_local.sh [options]
 #
@@ -26,6 +30,8 @@
 #   --stages <list>     Comma-separated subset of: build,unit,integration
 #                       (default: build,unit,integration).
 #   --skip-playwright   Skip the (heavy) Playwright browser install + UI tests.
+#                       Without it, a failed browser install FAILS the stage
+#                       rather than silently skipping the suite.
 #   --keep-stack        Do not tear down the docker compose stack at the end.
 #   -h, --help          Show this help and exit.
 #
@@ -225,9 +231,14 @@ stage_build() {
     info "go build upsiloneconomy"
     go build -o /dev/null ./upsiloneconomy/cmd/upsiloneconomy
 
+    # All four service Dockerfiles, matching ci.yml's "Verify Dockerfiles"
+    # step. The local mirror used to check only hub+api, so a syntax error in
+    # upsilonauth/upsiloneconomy could only ever be caught on GitHub.
     info "Dockerfile syntax checks"
-    docker build --check -f upsilonhub/Dockerfile . 2>/dev/null || warn "upsilonhub Dockerfile --check skipped"
-    docker build --check -f upsilonapi/Dockerfile . 2>/dev/null     || warn "upsilonapi Dockerfile --check skipped"
+    for svc in upsilonhub upsilonapi upsilonauth upsiloneconomy; do
+        docker build --check -f "$svc/Dockerfile" . 2>/dev/null \
+            || warn "$svc Dockerfile --check skipped"
+    done
 
     if [ -f tests/lint_report.sh ]; then
         chmod +x tests/lint_report.sh
@@ -243,6 +254,13 @@ stage_build() {
 stage_unit() {
     log "STAGE 2: Unit Tests"
     cd "$TARGET_DIR"
+
+    # ci.yml sets this on the go-tests job: the gateway suite shares one
+    # Postgres testcontainer across ~140 tests and the testcontainers Ryuk
+    # reaper can collect it mid-run. The mirror needs the same setting to
+    # reproduce CI, but unlike an ephemeral runner this box survives the run,
+    # so reap_testcontainers below does by hand what Ryuk would have done.
+    export TESTCONTAINERS_RYUK_DISABLED=true
 
     info "Go unit tests (modules derived from go.work)"
     go work sync
@@ -275,6 +293,21 @@ stage_unit() {
 }
 
 # ----------------------------------------------------------------------------
+# Ryuk is disabled for the unit stage (CI parity), so nothing garbage-collects
+# the throwaway Postgres containers the hub/auth/economy feature tests boot.
+# On a GitHub runner the VM is destroyed and this is moot; on a dev box the
+# containers would pile up run after run. Match on the label testcontainers-go
+# stamps on everything it creates.
+# ----------------------------------------------------------------------------
+reap_testcontainers() {
+    local ids
+    ids="$(docker ps -aq --filter 'label=org.testcontainers=true' 2>/dev/null || true)"
+    [ -n "$ids" ] || return 0
+    info "Reaping $(printf '%s\n' "$ids" | wc -l) leftover testcontainer(s) (Ryuk was disabled)"
+    docker rm -f $ids >/dev/null 2>&1 || true
+}
+
+# ----------------------------------------------------------------------------
 # STAGE 3 — Integration & E2E
 # ----------------------------------------------------------------------------
 stage_integration() {
@@ -282,11 +315,28 @@ stage_integration() {
     cd "$TARGET_DIR"
     local rc=0
 
-    # Playwright (host side) — optional/heavy
+    # Playwright (host side) — optional/heavy. NOTE: ci.yml deliberately does
+    # NOT run Playwright (see its "Playwright is temporarily excluded" note);
+    # the mirror is a superset here, so a red suite is on us, not on GitHub.
+    local playwright_ready=0
     if [ "$SKIP_PLAYWRIGHT" -eq 0 ] && command -v node >/dev/null 2>&1; then
         info "Installing Playwright dependencies (upsilonbattleui)"
-        ( cd upsilonbattleui && npm ci && npx playwright install --with-deps chromium ) \
-            || warn "Playwright install failed — UI tests will be skipped"
+        # No --with-deps: it escalates to `sudo apt-get update`, which needs a
+        # password (hanging an interactive run) and dies on any unrelated
+        # broken apt source on the host. The only packages it would add are
+        # CJK/Thai fonts and xvfb — headless Chromium needs none of them, and
+        # the snapshot baselines render through ANGLE/SwiftShader regardless.
+        # If a browser binary really is missing, `playwright install` alone
+        # fetches it into ~/.cache/ms-playwright without touching apt.
+        if ( cd upsilonbattleui && npm ci && npx playwright install chromium ); then
+            playwright_ready=1
+        else
+            # Do not degrade to a silent skip: a mirror that quietly runs
+            # nothing reports green for a suite it never executed (same class
+            # of bug as the stale-image regression fixed in ISS-135).
+            err "Playwright install failed — UI tests cannot run"
+            rc=1
+        fi
     else
         warn "Skipping Playwright install (--skip-playwright or node missing)"
     fi
@@ -303,9 +353,18 @@ stage_integration() {
     $COMPOSE up -d --build --wait --wait-timeout 300
     $COMPOSE ps
 
-    if [ "$SKIP_PLAYWRIGHT" -eq 0 ] && command -v node >/dev/null 2>&1 && [ -d upsilonbattleui/node_modules ]; then
+    if [ "$playwright_ready" -eq 1 ]; then
         log "E2E: Playwright tests"
-        ( cd upsilonbattleui && PLAYWRIGHT_BASE_URL=http://localhost:8085 npx playwright test --workers=1 ) || { warn "Playwright tests reported failures"; rc=1; }
+        # The repo config ships list+html only. Append json+junit here so the
+        # run leaves something diffable behind — the HTML report alone can't
+        # be summarised or compared between runs.
+        ( cd upsilonbattleui \
+            && PLAYWRIGHT_BASE_URL=http://localhost:8085 \
+               PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results.json \
+               PLAYWRIGHT_JUNIT_OUTPUT_NAME=playwright-junit.xml \
+               npx playwright test --workers=1 \
+                   --reporter=list,html,json,junit ) \
+            || { warn "Playwright tests reported failures"; rc=1; }
     fi
 
     log "E2E: Centralized customer scenarios"
@@ -320,6 +379,16 @@ stage_integration() {
         ./tests/edge_case_report.sh > edge_case_report.md 2>&1 || true
     fi
     info "Reports: $TARGET_DIR/ci_report.md  $TARGET_DIR/edge_case_report.md"
+
+    # Collected whether the suite passed or failed: the report is the only
+    # record of the run and it otherwise dies with the throwaway clone.
+    if [ "$playwright_ready" -eq 1 ]; then
+        mkdir -p ci_logs/playwright
+        for f in playwright-report playwright-results.json playwright-junit.xml; do
+            [ -e "upsilonbattleui/$f" ] && cp -r "upsilonbattleui/$f" ci_logs/playwright/ || true
+        done
+        info "Playwright report: $TARGET_DIR/ci_logs/playwright/"
+    fi
 
     if [ "$rc" -ne 0 ]; then
         warn "Collecting docker logs (failures detected)"
@@ -355,7 +424,7 @@ main() {
     prepare_env
 
     if want_stage build;       then stage_build       || FAILED_STAGES+=("build"); fi
-    if want_stage unit;        then stage_unit        || FAILED_STAGES+=("unit"); fi
+    if want_stage unit;        then stage_unit        || FAILED_STAGES+=("unit"); reap_testcontainers; fi
     if want_stage integration; then stage_integration || FAILED_STAGES+=("integration"); fi
 
     echo

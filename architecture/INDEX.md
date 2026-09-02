@@ -19,3 +19,4 @@ remains in git if ever needed.
 | [observability.md](observability.md) | The platform-wide OpenTelemetry strategy and the current instrumentation state. |
 | [how_to_add_a_service.md](how_to_add_a_service.md) | Step-by-step playbook for extracting or adding a new platform service (repo, DB, migrate/seed, S2S, CI, Caddy). |
 | [prod_cutover_runbook.md](prod_cutover_runbook.md) | Reference procedure for adopting a single-DB deployment into the per-service topology — companion to the guarded `scripts/cutover_extraction.sh`. Reference only; never run (there is no production DB). |
+| [property_key_vocabulary.md](property_key_vocabulary.md) | The frozen 64-key property vocabulary for the unified `property.Key` space: scope, kind, default-when-absent, composition rule and info level per key, plus the complete rename map. Specification for the `upsilontypes` registry. |
