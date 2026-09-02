@@ -4,7 +4,7 @@
 **Ref:** ISS-145
 **Date:** 2026-08-27
 **Severity:** High
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonbattle/battlearena/property/effect/effectapplicator/effectapplicator.go`
 **Partial:** Defect 2 (Dodge read from attacker) RESOLVED 2026-08-28. Defect 1 (entity-reachability) outstanding — this is what keeps the issue Open.
 **Affects:**
@@ -190,3 +190,11 @@ an entity-level counterpart is still undecided, and it affects ISS-143's rename 
   confirmed failing pre-fix. Reviewer verdict OKAY. **Defect 1 remains Open and unstarted** — the
   crit/accuracy/dodge entity-reachability work was explicitly excluded from that handoff's scope.
   Issue status set to `Open (Defect 2 resolved; Defect 1 outstanding)`. Not yet committed.
+
+- **2026-09-02 — RESOLVED** by the Property Key Space Unification round. The four combat modifiers
+  are now registered dual-scope and are reachable on entities, not skills alone:
+  `Accuracy` (`registry_skill_targeting.go:27`), `Dodge` (`:31`),
+  `CriticalChance` (`registry_skill_effect.go:30`) and `CriticalMultiplier` (`:34`), each
+  `Scopes: ScopeSkill | ScopeEntity, Kind: KindInt, Composition: CompositionAdd`. Because the
+  registry is the single source of truth for scope, entity-side resolution no longer depends on a
+  fallthrough that guessed — a wrong-scope lookup is now an explicit `ErrPropertyKeyWrongScope`.

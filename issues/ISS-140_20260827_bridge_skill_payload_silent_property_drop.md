@@ -4,7 +4,7 @@
 **Ref:** `ISS-140`
 **Date:** 2026-08-27
 **Severity:** High
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonapi/bridge/bridge_utils.go` (`buildSkillEffect`, `buildSkillPropertyMap`, `setSkillPropValue`)
 **Affects:** `upsilonapi/bridge/bridge_start.go` (arena start), `upsilonapi/bridge/bridge_resurrect.go` (arena resurrection),
 every skill Targeting / Costs / Effect payload authored through `admin_skill_template_create`,
@@ -248,3 +248,18 @@ already written down.
   tracked as non-deterministically flaky, and this fix edits line 26 of that same file. A failure
   after the edit may be the pre-existing flake rather than a regression; equally, one green run is
   not proof.
+
+- **2026-09-02 — RESOLVED** by the Property Key Space Unification round.
+  `setSkillPropValue` now returns an `error`, and **all four call sites propagate it instead of
+  dropping it**: `buildSkillPropertyMap` and `buildSkillEffect` (`bridge_utils.go`) accumulate into
+  `errs` and continue (collect-all, so one bad key does not mask the rest), `bridge_start.go` does
+  the same on the item path, and `bridge_resurrect.go` wraps and returns. Resolution failures are now
+  reported as one of two sentinel errors — `ErrUnknownPropertyKey` and `ErrPropertyKeyWrongScope`
+  (`bridge_utils.go:14-23`) — so "this key does not exist" and "this key exists but not in this
+  scope" are distinguishable rather than both vanishing silently (CODING_RULE §3/§4).
+
+  **Known residual, deliberately NOT fixed here and confirmed pre-existing by the reviewer:**
+  `bridge_start.go` still calls `e.RegisterSkill(s)` *before* inspecting the accumulated `errs`, so a
+  skill with a rejected key is still registered. Diffing against the pre-round revision shows the
+  same call ordering with no error propagation at all, so this round strictly improved the situation
+  without changing that ordering. Filed for a follow-up round.

@@ -4,7 +4,7 @@
 **Ref:** ISS-147
 **Date:** 2026-08-28
 **Severity:** Medium
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonbattle/battlearena/property/effect/effectapplicator/effectapplicator.go`
 **Affects:**
 - `upsilonbattle/battlearena/ruler/rules/beginingofturn.go:24-42` (Stun decay — same pattern)
@@ -122,3 +122,14 @@ weakness surfacing on a different property class.
   than applying a delta — it does apply a delta; that claim is not backed by the diff and is
   consistent with known weak-local-model false signal on semantic checks. Only the Poison/Stun
   finding is load-bearing.
+
+- **2026-09-02 — RESOLVED** by the Property Key Space Unification round. The item->entity
+  fallthrough that let a persisted buff carrying an entity-only status key (`Poison`/`Shield`/`Stun`)
+  be silently reinterpreted as the real entity property is gone: resolution is registry-backed and
+  scope-filtered, so such a key is rejected with `ErrPropertyKeyWrongScope` instead of being
+  invented. `Shield`, `Poison` and `Stun` remain entity-only in the registry — verified by grep, the
+  trio this issue was filed about is exactly the trio that stayed entity-only while 8 other keys went
+  dual-scope. Two red-first regression tests pin both copies of the defect:
+  `bridge/property_ingestion_test.go` (arena start) and
+  `bridge/property_resurrect_fallthrough_test.go` (the crash-recovery path via
+  `restoreEntityBuffs`/`hydrateSingleBuffProperty`, which had zero coverage before).

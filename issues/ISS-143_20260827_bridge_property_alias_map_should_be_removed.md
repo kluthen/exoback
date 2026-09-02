@@ -4,7 +4,7 @@
 **Ref:** `ISS-143`
 **Date:** 2026-08-27
 **Severity:** Medium
-**Status:** Open
+**Status:** Resolved
 **Component:** `upsilonapi/bridge/bridge_utils.go` (`propertyAliasMap`, lines 12-16)
 **Affects:** `upsilonapi/bridge/bridge_start.go:217` (`applyItemAsBuff`), `upsilonapi/bridge/bridge_resurrect.go:186`
 (`hydrateSingleBuffProperty`), `upsilonbattleui/src/Composables/useCharacterStats.js:29,43,48-49`,
@@ -138,3 +138,13 @@ character stat display in `upsilonbattleui` and the hub's `crit_chance`/`crit_da
 - `upsilontypes/property/propertyenum.go:75-76,153` — canonical `CriticalChance`/`CriticalMultiplier` and the `ArmorRating = "Armor"` declaration
 - `issues/ISS-140_20260827_bridge_skill_payload_silent_property_drop.md` — the fail-fast fix that retains this map as an annotated allow-list
 - `CODING_RULE.md` §4 (strict API contract adherence)
+
+## Change Log
+
+- **2026-09-02 — RESOLVED** by the Property Key Space Unification round. `propertyAliasMap` is
+  **deleted outright**; `grep -rn propertyAliasMap upsilonapi/` returns only three hits, all of them
+  comments in `bridge/property_alias_test.go` documenting the removal. The map existed to paper over
+  the three-way `EntityProperties`/`SkillProperties`/`ItemProperties` split; with the unified
+  `property.Key` and the `def` registry as the single source of truth, there is nothing left to
+  alias. `property_alias_test.go` was written first (CODING_RULE §5) and pins that the wire keys
+  formerly needing an alias now resolve directly through the registry.
